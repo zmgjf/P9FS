@@ -12,14 +12,14 @@ export default function FutsalDashboard() {
   ]);
   const [event, setEvent] = useState("");
 
-  const addScore = (index) => {
+  const addScore = (index: number) => {
     const newTeams = [...teams];
     newTeams[index].score += 1;
     newTeams[index].timeline.push(`+1점 (시간: ${new Date().toLocaleTimeString()})`);
     setTeams(newTeams);
   };
 
-  const addEvent = (index) => {
+  const addEvent = (index: number) => {
     if (!event.trim()) return;
     const newTeams = [...teams];
     newTeams[index].timeline.push(`${event} (시간: ${new Date().toLocaleTimeString()})`);
