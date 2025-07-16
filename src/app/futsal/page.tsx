@@ -6,7 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 // redeploy test
 export default function FutsalDashboard() {
-  const [teams, setTeams] = useState([
+  interface Team {
+    name: string;
+    score: number;
+    timeline: string[];
+  }
+
+  const [teams, setTeams] = useState<Team[]>([
     { name: "Team A", score: 0, timeline: [] },
     { name: "Team B", score: 0, timeline: [] },
   ]);
