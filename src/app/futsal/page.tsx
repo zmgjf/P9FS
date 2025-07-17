@@ -34,7 +34,7 @@ interface GameEvent {
   team: 'A' | 'B';
 }
 
-type AppPhase = 'teamManagement' | 'setSetup' | 'playing' | 'paused' | 'finished';
+type AppPhase = 'teamManagement' | 'setSetup' | 'gameReady' | 'playing' | 'paused' | 'finished';
 type ActionMode = 'none' | 'goal' | 'assist' | 'ownGoal';
 
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -173,7 +173,7 @@ export default function FutsalManager() {
     setNewSetName('');
     setSelectedTeamAId('');
     setSelectedTeamBId('');
-    setAppPhase('setSetup');
+    setAppPhase('gameReady');
   };
 
   // 게임 시작
@@ -684,7 +684,7 @@ export default function FutsalManager() {
         gap: '10px', 
         marginBottom: '20px' 
       }}>
-        {appPhase === 'setSetup' && (
+        {appPhase === 'gameReady' && (
           <button 
             onClick={startGame}
             style={{ 
