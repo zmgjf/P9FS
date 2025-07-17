@@ -1505,52 +1505,167 @@ export default function FutsalManager() {
       }}>
         <h3>경기 기록</h3>
         {currentSet.events.length === 0 ? (
-          <p style={{ color: '#7f8c8d' }}>아직 기록된 이벤트가 없습니다.</p>
+          <p style={{ color: '#7f8c8d', textAlign: 'center' }}>아직 기록된 이벤트가 없습니다.</p>
         ) : (
-          currentSet.events.map(event => (
-            <div key={event.id} style={{ 
-              padding: '8px', 
-              borderBottom: '1px solid #eee',
+          <div style={{ position: 'relative' }}>
+            {/* 중앙선 */}
+            <div style={{
+              position: 'absolute',
+              left: '50%',
+              top: '0',
+              bottom: '0',
+              width: '2px',
+              backgroundColor: '#e5e7eb',
+              transform: 'translateX(-50%)',
+              zIndex: 1
+            }}></div>
+            
+            {currentSet.events.map((event, index) => {
+              const isTeamA = event.team === 'A';
+              return (
+                <div key={event.id} style={{ 
+                  display: 'flex',
+                  justifyContent: isTeamA ? 'flex-start' : 'flex-end',
+                  marginBottom: '10px',
+                  position: 'relative',
+                  zIndex: 2
+                }}>
+                  <div style={{
+                    maxWidth: '45%',
+                    backgroundColor: isTeamA ? '#fee2e2' : '#dbeafe',
+                    border: `2px solid ${isTeamA ? '#ef4444' : '#3b82f6'}`,
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    position: 'relative'
+                  }}>
+                    {/* 말풍선 꼬리 */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '50%',
+                      [isTeamA ? 'right' : 'left']: '-8px',
+                      transform: 'translateY(-50%)',
+                      width: '0',
+                      height: '0',
+                      borderTop: '6px solid transparent',
+                      borderBottom: '6px solid transparent',
+                      [isTeamA ? 'borderLeft' : 'borderRight']: `8px solid ${isTeamA ? '#ef4444' : '#3b82f6'}`
+                    }}></div>
+                    
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '4px'
+                    }}>
+                      <span style={{ 
+                        fontWeight: 'bold',
+                        fontSize: '12px',
+                        color: isTeamA ? '#dc2626' : '#2563eb'
+                      }}>
+                        {event.time}
+                      </span>
+                      {appPhase !== 'finished' && (
+                        <button
+                          onClick={() => deleteEvent(event.id)}
+                          style={{ 
+                            padding: '2px 6px', 
+                            backgroundColor: '#ef4444', 
+                            color: 'white', 
+                            border: 'none', 
+                            borderRadius: '3px',
+                            fontSize: '10px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                    
+                    <div style={{ fontSize: '14px', lineHeight: '1.3' }}>
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '4px',
+                        marginBottom: '2px'
+                      }}>
+                        <span style={{ fontSize: '16px' }}>
+                          {event.type === 'goal' ? '⚽' : '⚫'}
+                        </span>
+                        <strong>{event.player.name}</strong>
+                        <span style={{ color: '#666' }}>
+                          {event.type === 'goal' ? '골' : '자책골'}
+                        </span>
+                      </div>
+                      
+                      {event.assistPlayer && (
+                        <div style={{ 
+                          fontSize: '12px', 
+                          color: '#666',
+                          fontStyle: 'italic'
+                        }}>
+                          🅰️ {event.assistPlayer.name}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div style={{ 
+                      marginTop: '4px',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      color: isTeamA ? '#dc2626' : '#2563eb',
+                      textAlign: isTeamA ? 'left' : 'right'
+                    }}>
+                      {isTeamA ? currentSet.teamA.name : currentSet.teamB.name}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            
+            {/* 하단 팀 표시 */}
+            <div style={{
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'center'
+              marginTop: '15px',
+              paddingTop: '10px',
+              borderTop: '1px solid #e5e7eb'
             }}>
-              <span style={{ flex: 1 }}>
-                <strong>{event.time}</strong> - 
-                {event.type === 'goal' && ' ⚽ '}
-                {event.type === 'ownGoal' && ' ⚫ '}
-                <strong>{event.player.name}</strong>
-                {event.type === 'goal' && ' 골'}
-                {event.type === 'ownGoal' && ' 자책골'}
-                {event.assistPlayer && ` | 어시스트: ${event.assistPlayer.name}`}
-              </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ 
-                  color: event.team === 'A' ? '#e74c3c' : '#3498db',
-                  fontWeight: 'bold',
-                  minWidth: '80px',
-                  textAlign: 'right'
-                }}>
-                  {event.team === 'A' ? currentSet.teamA.name : currentSet.teamB.name}
-                </span>
-                {appPhase !== 'finished' && (
-                  <button
-                    onClick={() => deleteEvent(event.id)}
-                    style={{ 
-                      padding: '2px 6px', 
-                      backgroundColor: '#e74c3c', 
-                      color: 'white', 
-                      border: 'none', 
-                      borderRadius: '3px',
-                      fontSize: '10px'
-                    }}
-                  >
-                    삭제
-                  </button>
-                )}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '12px',
+                color: '#dc2626',
+                fontWeight: 'bold'
+              }}>
+                <div style={{
+                  width: '12px',
+                  height: '12px',
+                  backgroundColor: '#ef4444',
+                  borderRadius: '50%'
+                }}></div>
+                {currentSet.teamA.name}
+              </div>
+              
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '12px',
+                color: '#2563eb',
+                fontWeight: 'bold'
+              }}>
+                {currentSet.teamB.name}
+                <div style={{
+                  width: '12px',
+                  height: '12px',
+                  backgroundColor: '#3b82f6',
+                  borderRadius: '50%'
+                }}></div>
               </div>
             </div>
-          ))
+          </div>
         )}
       </div>
     </div>
