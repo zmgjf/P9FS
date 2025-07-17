@@ -11,59 +11,105 @@ interface Team {
   id: string;
   name: string;
   players: Player[];
-}
-
-interface GameSet {
-  id: string;
-  name: string;
-  duration: number; // 분 단위
-  teamA: Team;
-  teamB: Team;
-  isActive: boolean;
-  startTime?: number;
-  events: GameEvent[];
+  createdAt: string;
 }
 
 interface GameEvent {
   id: string;
   time: string;
-  realTime: number; // 실제 경과 시간 (초)
-  type: 'goal' | 'assist' | 'ownGoal';
+  realTime: number;
+  type: 'goal' | 'ownGoal';
   player: Player;
   assistPlayer?: Player;
   team: 'A' | 'B';
 }
 
-type AppPhase = 'teamManagement' | 'setSetup' | 'gameReady' | 'playing' | 'paused' | 'finished';
-type ActionMode = 'none' | 'goal' | 'assist' | 'ownGoal';
+interface GameSet {
+  id: string;
+  name: string;
+  duration: number;
+  teamA: Team;
+  teamB: Team;
+  isActive: boolean;
+  startTime?: number;
+  events: GameEvent[];
+  finalScore?: { teamA: number; teamB: number };
+  completedAt?: string;
+}
+
+interface Match {
+  id: string;
+  name: string;
+  venue: string;
+  date: string;
+  sets: GameSet[];
+  createdAt: string;
+}
+
+type AppPhase = 'matchManagement' | 'teamManagement' | 'setSetup' | 'gameReady' | 'playing' | 'paused' | 'finished';
+type ActionMode = 'none' | 'goal' | 'ownGoal';
 
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
 
 export default function FutsalManager() {
   // 앱 상태
-  const [appPhase, setAppPhase] = useState<AppPhase>('teamManagement');
+  const [appPhase, setAppPhase] = useState<AppPhase>('matchManagement');
   const [actionMode, setActionMode] = useState<ActionMode>('none');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-  const [assistPlayer, setAssistPlayer] = useState<Player | null>(null);
+  
+  // 데이터 관리
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [currentMatch, setCurrentMatch] = useState<Match | null>(null);
+  const [currentSetIndex, setCurrentSetIndex] = useState(0);
+  const [gameTime, setGameTime] = useState(0);
+  
+  // 매치 생성
+  const [newMatchName, setNewMatchName] = useState('');
+  const [newMatchVenue, setNewMatchVenue] = useState('');
   
   // 팀 관리
-  const [teams, setTeams] = useState<Team[]>([]);
   const [newTeamName, setNewTeamName] = useState('');
   const [newPlayerName, setNewPlayerName] = useState('');
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   
-  // 게임 세트
-  const [sets, setSets] = useState<GameSet[]>([]);
-  const [currentSetIndex, setCurrentSetIndex] = useState(0);
-  const [gameTime, setGameTime] = useState(0); // 경과 시간 (초)
-  
-  // 새 세트 생성 정보
+  // 세트 생성
   const [newSetName, setNewSetName] = useState('');
   const [newSetDuration, setNewSetDuration] = useState(10);
   const [selectedTeamAId, setSelectedTeamAId] = useState('');
   const [selectedTeamBId, setSelectedTeamBId] = useState('');
 
-  const currentSet = sets[currentSetIndex];
+  const currentSet = currentMatch?.sets[currentSetIndex];
+
+  // 로컬 스토리지 저장/로드
+  useEffect(() => {
+    // 데이터 로드
+    const savedTeams = localStorage.getItem('futsal_teams');
+    const savedMatches = localStorage.getItem('futsal_matches');
+    const savedCurrentMatch = localStorage.getItem('futsal_current_match');
+
+    if (savedTeams) setTeams(JSON.parse(savedTeams));
+    if (savedMatches) setMatches(JSON.parse(savedMatches));
+    if (savedCurrentMatch) {
+      setCurrentMatch(JSON.parse(savedCurrentMatch));
+      setAppPhase('setSetup');
+    }
+  }, []);
+
+  // 데이터 변경시 자동 저장
+  useEffect(() => {
+    localStorage.setItem('futsal_teams', JSON.stringify(teams));
+  }, [teams]);
+
+  useEffect(() => {
+    localStorage.setItem('futsal_matches', JSON.stringify(matches));
+  }, [matches]);
+
+  useEffect(() => {
+    if (currentMatch) {
+      localStorage.setItem('futsal_current_match', JSON.stringify(currentMatch));
+    }
+  }, [currentMatch]);
 
   // 게임 타이머
   useEffect(() => {
@@ -73,7 +119,7 @@ export default function FutsalManager() {
         setGameTime(prev => {
           const newTime = prev + 1;
           if (newTime >= currentSet.duration * 60) {
-            setAppPhase('finished');
+            finishSet();
             return currentSet.duration * 60;
           }
           return newTime;
@@ -83,7 +129,30 @@ export default function FutsalManager() {
     return () => clearInterval(interval);
   }, [appPhase, currentSet]);
 
-  // 팀 생성
+  // 매치 생성
+  const createMatch = () => {
+    if (!newMatchName.trim() || !newMatchVenue.trim()) {
+      alert('경기명과 구장명을 입력하세요.');
+      return;
+    }
+
+    const newMatch: Match = {
+      id: generateId(),
+      name: newMatchName,
+      venue: newMatchVenue,
+      date: new Date().toLocaleDateString('ko-KR'),
+      sets: [],
+      createdAt: new Date().toISOString()
+    };
+
+    setCurrentMatch(newMatch);
+    setMatches(prev => [...prev, newMatch]);
+    setNewMatchName('');
+    setNewMatchVenue('');
+    setAppPhase('teamManagement');
+  };
+
+  // 팀 관리
   const createTeam = () => {
     if (!newTeamName.trim()) {
       alert('팀 이름을 입력하세요.');
@@ -93,14 +162,14 @@ export default function FutsalManager() {
     const newTeam: Team = {
       id: generateId(),
       name: newTeamName,
-      players: []
+      players: [],
+      createdAt: new Date().toISOString()
     };
 
     setTeams(prev => [...prev, newTeam]);
     setNewTeamName('');
   };
 
-  // 선수 추가
   const addPlayer = (teamId: string) => {
     if (!newPlayerName.trim()) {
       alert('선수 이름을 입력하세요.');
@@ -120,14 +189,12 @@ export default function FutsalManager() {
     setNewPlayerName('');
   };
 
-  // 팀 삭제
   const deleteTeam = (teamId: string) => {
     if (confirm('정말 이 팀을 삭제하시겠습니까?')) {
       setTeams(prev => prev.filter(team => team.id !== teamId));
     }
   };
 
-  // 선수 삭제
   const deletePlayer = (teamId: string, playerId: string) => {
     setTeams(prev => prev.map(team => 
       team.id === teamId 
@@ -136,9 +203,9 @@ export default function FutsalManager() {
     ));
   };
 
-  // 세트 생성
+  // 세트 관리
   const createSet = () => {
-    if (!newSetName || !selectedTeamAId || !selectedTeamBId) {
+    if (!currentMatch || !newSetName || !selectedTeamAId || !selectedTeamBId) {
       alert('모든 정보를 입력하세요.');
       return;
     }
@@ -166,55 +233,99 @@ export default function FutsalManager() {
       events: []
     };
 
-    setSets(prev => [...prev, newSet]);
-    setCurrentSetIndex(sets.length);
+    const updatedMatch = {
+      ...currentMatch,
+      sets: [...currentMatch.sets, newSet]
+    };
+
+    setCurrentMatch(updatedMatch);
+    setMatches(prev => prev.map(m => m.id === currentMatch.id ? updatedMatch : m));
+    setCurrentSetIndex(currentMatch.sets.length);
     
-    // 초기화
     setNewSetName('');
     setSelectedTeamAId('');
     setSelectedTeamBId('');
     setAppPhase('gameReady');
   };
 
-  // 게임 시작
+  // 게임 관리
   const startGame = () => {
-    if (!currentSet) return;
+    if (!currentSet || !currentMatch) return;
     
-    setSets(prev => prev.map((set, idx) => 
+    const updatedSets = currentMatch.sets.map((set, idx) => 
       idx === currentSetIndex 
         ? { ...set, isActive: true, startTime: Date.now() }
         : set
-    ));
+    );
+
+    const updatedMatch = { ...currentMatch, sets: updatedSets };
+    setCurrentMatch(updatedMatch);
+    setMatches(prev => prev.map(m => m.id === currentMatch.id ? updatedMatch : m));
+    
     setGameTime(0);
     setAppPhase('playing');
   };
 
-  // 게임 일시정지/재개
   const togglePause = () => {
     setAppPhase(prev => prev === 'playing' ? 'paused' : 'playing');
   };
 
-  // 플레이어 클릭 처리
+  const finishSet = () => {
+    if (!currentSet || !currentMatch) return;
+
+    const scoreA = getScore('A');
+    const scoreB = getScore('B');
+
+    const updatedSets = currentMatch.sets.map((set, idx) => 
+      idx === currentSetIndex 
+        ? { 
+            ...set, 
+            isActive: false, 
+            finalScore: { teamA: scoreA, teamB: scoreB },
+            completedAt: new Date().toISOString()
+          }
+        : set
+    );
+
+    const updatedMatch = { ...currentMatch, sets: updatedSets };
+    setCurrentMatch(updatedMatch);
+    setMatches(prev => prev.map(m => m.id === currentMatch.id ? updatedMatch : m));
+    
+    setAppPhase('finished');
+  };
+
+  // 이벤트 처리
   const handlePlayerClick = (player: Player, team: 'A' | 'B') => {
     if (appPhase !== 'playing') return;
 
-    if (actionMode === 'goal' || actionMode === 'ownGoal') {
-      if (!selectedPlayer) {
-        setSelectedPlayer(player);
-        if (actionMode === 'ownGoal') {
-          recordEvent(actionMode, player, team);
-        }
-      }
-    } else if (actionMode === 'assist') {
-      if (selectedPlayer && !assistPlayer) {
-        setAssistPlayer(player);
-        recordEvent('goal', selectedPlayer, team, player);
-      }
+    if (actionMode === 'goal') {
+      setSelectedPlayer(player);
+    } else if (actionMode === 'ownGoal') {
+      recordEvent('ownGoal', player, team);
     }
   };
 
-  // 이벤트 기록
+  const recordGoalOnly = () => {
+    if (!selectedPlayer || !currentSet) return;
+    
+    const isTeamA = currentSet.teamA.players.some(p => p.id === selectedPlayer.id);
+    const team = isTeamA ? 'A' : 'B';
+    
+    recordEvent('goal', selectedPlayer, team);
+  };
+
+  const recordGoalWithAssist = (assistPlayer: Player) => {
+    if (!selectedPlayer || !currentSet) return;
+    
+    const isTeamA = currentSet.teamA.players.some(p => p.id === selectedPlayer.id);
+    const team = isTeamA ? 'A' : 'B';
+    
+    recordEvent('goal', selectedPlayer, team, assistPlayer);
+  };
+
   const recordEvent = (type: 'goal' | 'ownGoal', scorer: Player, team: 'A' | 'B', assist?: Player) => {
+    if (!currentMatch || !currentSet) return;
+
     const minutes = Math.floor(gameTime / 60);
     const seconds = gameTime % 60;
     const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
@@ -229,16 +340,18 @@ export default function FutsalManager() {
       team
     };
 
-    setSets(prev => prev.map((set, idx) => 
+    const updatedSets = currentMatch.sets.map((set, idx) => 
       idx === currentSetIndex 
         ? { ...set, events: [...set.events, event] }
         : set
-    ));
+    );
 
-    // 초기화
+    const updatedMatch = { ...currentMatch, sets: updatedSets };
+    setCurrentMatch(updatedMatch);
+    setMatches(prev => prev.map(m => m.id === currentMatch.id ? updatedMatch : m));
+
     setActionMode('none');
     setSelectedPlayer(null);
-    setAssistPlayer(null);
   };
 
   const formatTime = (seconds: number) => {
@@ -254,28 +367,222 @@ export default function FutsalManager() {
     ).length;
   };
 
+  const exportData = () => {
+    const data = {
+      teams,
+      matches,
+      exportedAt: new Date().toISOString()
+    };
+    
+    const dataStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `futsal_data_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // 헤더 컴포넌트
+  const renderHeader = () => currentMatch && (
+    <div style={{ 
+      backgroundColor: '#2c3e50',
+      color: 'white',
+      padding: '15px 20px',
+      borderRadius: '8px',
+      marginBottom: '20px'
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h2 style={{ margin: '0 0 5px 0' }}>{currentMatch.name}</h2>
+          <p style={{ margin: 0, opacity: 0.8 }}>{currentMatch.venue} | {currentMatch.date}</p>
+        </div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            onClick={() => setAppPhase('matchManagement')}
+            style={{ 
+              padding: '8px 12px', 
+              backgroundColor: '#95a5a6', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '4px' 
+            }}
+          >
+            경기 목록
+          </button>
+          <button 
+            onClick={() => setAppPhase('teamManagement')}
+            style={{ 
+              padding: '8px 12px', 
+              backgroundColor: '#e67e22', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '4px' 
+            }}
+          >
+            팀 관리
+          </button>
+          <button 
+            onClick={() => setAppPhase('setSetup')}
+            style={{ 
+              padding: '8px 12px', 
+              backgroundColor: '#3498db', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '4px' 
+            }}
+          >
+            세트 관리
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // 매치 관리 화면
+  if (appPhase === 'matchManagement') {
+    return (
+      <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto' }}>
+        <h1 style={{ textAlign: 'center', marginBottom: '30px' }}>⚽ 풋살 매니저</h1>
+        
+        <div style={{ 
+          backgroundColor: 'white', 
+          padding: '30px', 
+          borderRadius: '8px', 
+          marginBottom: '30px',
+          border: '2px solid #3498db'
+        }}>
+          <h2 style={{ marginBottom: '20px' }}>새 경기 만들기</h2>
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>경기명:</label>
+            <input 
+              type="text" 
+              value={newMatchName}
+              onChange={(e) => setNewMatchName(e.target.value)}
+              placeholder="예: 2024 신년 풋살 대회"
+              style={{ 
+                width: '100%', 
+                padding: '10px', 
+                border: '1px solid #ddd', 
+                borderRadius: '4px',
+                fontSize: '16px'
+              }}
+            />
+          </div>
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>구장명:</label>
+            <input 
+              type="text" 
+              value={newMatchVenue}
+              onChange={(e) => setNewMatchVenue(e.target.value)}
+              placeholder="예: 강남 풋살파크"
+              style={{ 
+                width: '100%', 
+                padding: '10px', 
+                border: '1px solid #ddd', 
+                borderRadius: '4px',
+                fontSize: '16px'
+              }}
+            />
+          </div>
+          <button 
+            onClick={createMatch}
+            style={{ 
+              width: '100%',
+              padding: '15px', 
+              backgroundColor: '#3498db', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '5px',
+              fontSize: '18px',
+              fontWeight: 'bold'
+            }}
+          >
+            경기 만들기
+          </button>
+        </div>
+
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h2>경기 기록</h2>
+            <button 
+              onClick={exportData}
+              style={{ 
+                padding: '8px 16px', 
+                backgroundColor: '#27ae60', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '4px' 
+              }}
+            >
+              📥 데이터 내보내기
+            </button>
+          </div>
+          
+          {matches.length === 0 ? (
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '40px', 
+              backgroundColor: '#f8f9fa',
+              borderRadius: '8px',
+              color: '#666'
+            }}>
+              아직 경기 기록이 없습니다.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: '15px' }}>
+              {matches.map(match => (
+                <div key={match.id} style={{ 
+                  backgroundColor: 'white', 
+                  padding: '20px', 
+                  borderRadius: '8px',
+                  border: '1px solid #ddd',
+                  cursor: 'pointer'
+                }}
+                onClick={() => {
+                  setCurrentMatch(match);
+                  setAppPhase('setSetup');
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <h3 style={{ margin: '0 0 5px 0' }}>{match.name}</h3>
+                      <p style={{ margin: '0', color: '#666' }}>{match.venue} | {match.date}</p>
+                      <p style={{ margin: '5px 0 0 0', fontSize: '14px', color: '#999' }}>
+                        {match.sets.length}개 세트
+                      </p>
+                    </div>
+                    <div style={{ fontSize: '20px' }}>⚽</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentMatch) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center' }}>
+        <h2>경기가 선택되지 않았습니다.</h2>
+        <button onClick={() => setAppPhase('matchManagement')}>경기 관리로 이동</button>
+      </div>
+    );
+  }
+
   // 팀 관리 화면
   if (appPhase === 'teamManagement') {
     return (
       <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-          <h1>⚽ 팀 관리</h1>
-          <button 
-            onClick={() => setAppPhase('setSetup')}
-            style={{ 
-              padding: '10px 20px', 
-              backgroundColor: '#27ae60', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '5px',
-              fontSize: '16px'
-            }}
-          >
-            세트 만들기
-          </button>
-        </div>
+        {renderHeader()}
         
-        {/* 새 팀 생성 */}
+        <h1>👥 팀 관리</h1>
+        
         <div style={{ 
           backgroundColor: 'white', 
           padding: '20px', 
@@ -312,7 +619,6 @@ export default function FutsalManager() {
           </div>
         </div>
 
-        {/* 팀 목록 */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
           {teams.map(team => (
             <div key={team.id} style={{ 
@@ -338,7 +644,6 @@ export default function FutsalManager() {
                 </button>
               </div>
               
-              {/* 선수 추가 */}
               <div style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
                 <input 
                   type="text" 
@@ -374,7 +679,6 @@ export default function FutsalManager() {
                 </button>
               </div>
               
-              {/* 선수 목록 */}
               <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
                 {team.players.length === 0 ? (
                   <p style={{ color: '#999', fontSize: '14px', textAlign: 'center' }}>
@@ -422,19 +726,6 @@ export default function FutsalManager() {
             </div>
           ))}
         </div>
-
-        {teams.length === 0 && (
-          <div style={{ 
-            textAlign: 'center', 
-            padding: '40px', 
-            color: '#999',
-            backgroundColor: 'white',
-            borderRadius: '8px',
-            border: '1px solid #ddd'
-          }}>
-            아직 팀이 없습니다. 위에서 새 팀을 만들어보세요!
-          </div>
-        )}
       </div>
     );
   }
@@ -442,24 +733,13 @@ export default function FutsalManager() {
   // 세트 설정 화면
   if (appPhase === 'setSetup') {
     return (
-      <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-          <h1>⚽ 새 세트 만들기</h1>
-          <button 
-            onClick={() => setAppPhase('teamManagement')}
-            style={{ 
-              padding: '8px 16px', 
-              backgroundColor: '#95a5a6', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '5px' 
-            }}
-          >
-            팀 관리로 돌아가기
-          </button>
-        </div>
+      <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
+        {renderHeader()}
         
-        <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '8px', border: '1px solid #ddd' }}>
+        <h1>⚽ 세트 관리</h1>
+        
+        <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '30px' }}>
+          <h3>새 세트 만들기</h3>
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>세트 이름:</label>
             <input 
@@ -558,6 +838,45 @@ export default function FutsalManager() {
           </button>
         </div>
 
+        {/* 기존 세트 목록 */}
+        {currentMatch.sets.length > 0 && (
+          <div>
+            <h3>세트 목록</h3>
+            <div style={{ display: 'grid', gap: '10px' }}>
+              {currentMatch.sets.map((set, idx) => (
+                <div key={set.id} style={{ 
+                  backgroundColor: 'white', 
+                  padding: '15px', 
+                  borderRadius: '8px',
+                  border: '1px solid #ddd',
+                  cursor: 'pointer'
+                }}
+                onClick={() => {
+                  setCurrentSetIndex(idx);
+                  setAppPhase('gameReady');
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 5px 0' }}>{set.name}</h4>
+                      <p style={{ margin: '0', fontSize: '14px', color: '#666' }}>
+                        {set.teamA.name} vs {set.teamB.name} | {set.duration}분
+                      </p>
+                      {set.finalScore && (
+                        <p style={{ margin: '5px 0 0 0', fontSize: '14px', fontWeight: 'bold' }}>
+                          최종 스코어: {set.finalScore.teamA} - {set.finalScore.teamB}
+                        </p>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '16px' }}>
+                      {set.completedAt ? '✅' : (set.isActive ? '🔄' : '⏸️')}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {teams.length === 0 && (
           <div style={{ 
             textAlign: 'center', 
@@ -574,25 +893,27 @@ export default function FutsalManager() {
     );
   }
 
-  // 게임 화면 (기존과 동일하되 currentSet이 있을 때만 렌더링)
+  // 게임 화면
   if (!currentSet) {
     return (
       <div style={{ padding: '20px', textAlign: 'center' }}>
         <h2>세트가 선택되지 않았습니다.</h2>
-        <button onClick={() => setAppPhase('setSetup')}>세트 만들기</button>
+        <button onClick={() => setAppPhase('setSetup')}>세트 관리로 이동</button>
       </div>
     );
   }
 
   return (
     <div style={{ padding: '10px', maxWidth: '1200px', margin: '0 auto' }}>
-      {/* 헤더 */}
+      {renderHeader()}
+
+      {/* 게임 헤더 */}
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
         marginBottom: '20px',
-        backgroundColor: '#2c3e50',
+        backgroundColor: '#34495e',
         color: 'white',
         padding: '15px 20px',
         borderRadius: '8px'
@@ -603,31 +924,10 @@ export default function FutsalManager() {
         <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
           {formatTime(gameTime)} / {formatTime(currentSet.duration * 60)}
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button 
-            onClick={() => setAppPhase('teamManagement')}
-            style={{ 
-              padding: '8px 12px', 
-              backgroundColor: '#95a5a6', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '4px' 
-            }}
-          >
-            팀 관리
-          </button>
-          <button 
-            onClick={() => setAppPhase('setSetup')}
-            style={{ 
-              padding: '8px 12px', 
-              backgroundColor: '#3498db', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '4px' 
-            }}
-          >
-            새 세트
-          </button>
+        <div style={{ fontSize: '18px' }}>
+          {appPhase === 'finished' ? '경기 종료' : 
+           appPhase === 'paused' ? '일시 정지' :
+           appPhase === 'playing' ? '경기 중' : '대기 중'}
         </div>
       </div>
 
@@ -636,7 +936,7 @@ export default function FutsalManager() {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: '#34495e',
+        backgroundColor: '#2c3e50',
         color: 'white',
         padding: '20px',
         borderRadius: '8px',
@@ -699,18 +999,32 @@ export default function FutsalManager() {
           </button>
         )}
         {(appPhase === 'playing' || appPhase === 'paused') && (
-          <button 
-            onClick={togglePause}
-            style={{ 
-              padding: '10px 20px', 
-              backgroundColor: appPhase === 'playing' ? '#f39c12' : '#27ae60', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '5px' 
-            }}
-          >
-            {appPhase === 'playing' ? '일시정지' : '재개'}
-          </button>
+          <>
+            <button 
+              onClick={togglePause}
+              style={{ 
+                padding: '10px 20px', 
+                backgroundColor: appPhase === 'playing' ? '#f39c12' : '#27ae60', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '5px' 
+              }}
+            >
+              {appPhase === 'playing' ? '일시정지' : '재개'}
+            </button>
+            <button 
+              onClick={finishSet}
+              style={{ 
+                padding: '10px 20px', 
+                backgroundColor: '#e74c3c', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '5px' 
+              }}
+            >
+              경기 종료
+            </button>
+          </>
         )}
       </div>
 
@@ -735,18 +1049,6 @@ export default function FutsalManager() {
             ⚽ 골
           </button>
           <button 
-            onClick={() => setActionMode('assist')}
-            style={{ 
-              padding: '10px 15px', 
-              backgroundColor: actionMode === 'assist' ? '#e74c3c' : '#95a5a6',
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '5px' 
-            }}
-          >
-            🅰️ 어시스트
-          </button>
-          <button 
             onClick={() => setActionMode('ownGoal')}
             style={{ 
               padding: '10px 15px', 
@@ -762,7 +1064,6 @@ export default function FutsalManager() {
             onClick={() => {
               setActionMode('none');
               setSelectedPlayer(null);
-              setAssistPlayer(null);
             }}
             style={{ 
               padding: '10px 15px', 
@@ -774,6 +1075,56 @@ export default function FutsalManager() {
           >
             취소
           </button>
+        </div>
+      )}
+
+      {/* 골 기록 확인 버튼들 (골 선택자가 선택된 경우) */}
+      {selectedPlayer && actionMode === 'goal' && appPhase === 'playing' && (
+        <div style={{ 
+          backgroundColor: '#f39c12', 
+          color: 'white', 
+          padding: '15px', 
+          borderRadius: '8px',
+          marginBottom: '20px',
+          textAlign: 'center'
+        }}>
+          <p style={{ margin: '0 0 10px 0' }}>
+            <strong>{selectedPlayer.name}</strong>이(가) 득점했습니다.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+            <button 
+              onClick={recordGoalOnly}
+              style={{ 
+                padding: '8px 16px', 
+                backgroundColor: '#27ae60', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '4px' 
+              }}
+            >
+              골만 기록
+            </button>
+            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+              {currentSet.teamA.players.concat(currentSet.teamB.players)
+                .filter(p => p.id !== selectedPlayer.id)
+                .map(player => (
+                <button 
+                  key={player.id}
+                  onClick={() => recordGoalWithAssist(player)}
+                  style={{ 
+                    padding: '6px 12px', 
+                    backgroundColor: '#3498db', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: '4px',
+                    fontSize: '12px'
+                  }}
+                >
+                  {player.name} 어시스트
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -876,18 +1227,16 @@ export default function FutsalManager() {
       </div>
 
       {/* 액션 안내 */}
-      {actionMode !== 'none' && appPhase === 'playing' && (
+      {actionMode !== 'none' && !selectedPlayer && appPhase === 'playing' && (
         <div style={{ 
           textAlign: 'center', 
           padding: '10px', 
-          backgroundColor: '#f39c12', 
+          backgroundColor: '#3498db', 
           color: 'white', 
           borderRadius: '5px',
           marginBottom: '20px'
         }}>
-          {actionMode === 'goal' && !selectedPlayer && '득점한 선수를 클릭하세요'}
-          {actionMode === 'goal' && selectedPlayer && '어시스트한 선수를 클릭하거나 취소를 누르세요'}
-          {actionMode === 'assist' && '어시스트한 선수를 클릭하세요'}
+          {actionMode === 'goal' && '득점한 선수를 클릭하세요'}
           {actionMode === 'ownGoal' && '자책골한 선수를 클릭하세요'}
         </div>
       )}
