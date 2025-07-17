@@ -390,6 +390,56 @@ export default function FutsalManager() {
     URL.revokeObjectURL(url);
   };
 
+  // 삭제 함수들
+  const deleteMatch = (matchId: string) => {
+    if (confirm('정말 이 경기를 삭제하시겠습니까? 모든 세트와 기록이 함께 삭제됩니다.')) {
+      setMatches(prev => prev.filter(m => m.id !== matchId));
+      
+      // 현재 매치가 삭제된 경우
+      if (currentMatch?.id === matchId) {
+        setCurrentMatch(null);
+        localStorage.removeItem('futsal_current_match');
+        setAppPhase('matchManagement');
+      }
+    }
+  };
+
+  const deleteSet = (setIndex: number) => {
+    if (!currentMatch) return;
+    
+    if (confirm('정말 이 세트를 삭제하시겠습니까? 모든 경기 기록이 함께 삭제됩니다.')) {
+      const updatedSets = currentMatch.sets.filter((_, idx) => idx !== setIndex);
+      const updatedMatch = { ...currentMatch, sets: updatedSets };
+      
+      setCurrentMatch(updatedMatch);
+      setMatches(prev => prev.map(m => m.id === currentMatch.id ? updatedMatch : m));
+      
+      // 현재 세트 인덱스 조정
+      if (setIndex === currentSetIndex && updatedSets.length > 0) {
+        setCurrentSetIndex(Math.max(0, setIndex - 1));
+      } else if (updatedSets.length === 0) {
+        setCurrentSetIndex(0);
+        setAppPhase('setSetup');
+      }
+    }
+  };
+
+  const deleteEvent = (eventId: string) => {
+    if (!currentMatch || !currentSet) return;
+    
+    if (confirm('이 기록을 삭제하시겠습니까?')) {
+      const updatedSets = currentMatch.sets.map((set, idx) => 
+        idx === currentSetIndex 
+          ? { ...set, events: set.events.filter(event => event.id !== eventId) }
+          : set
+      );
+
+      const updatedMatch = { ...currentMatch, sets: updatedSets };
+      setCurrentMatch(updatedMatch);
+      setMatches(prev => prev.map(m => m.id === currentMatch.id ? updatedMatch : m));
+    }
+  };
+
   // 세트 삭제
   const deleteSet = (setIndex: number) => {
     if (!currentMatch) return;
