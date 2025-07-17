@@ -510,6 +510,26 @@ export default function FutsalManager() {
     event.target.value = '';
   };
 
+  const exportData = () => {
+    const data = {
+      teams,
+      matches,
+      exportedAt: new Date().toISOString()
+    };
+    
+    const dataStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `futsal_data_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   // 헤더 컴포넌트
   const renderHeader = () => currentMatch && (
     <div style={{ 
