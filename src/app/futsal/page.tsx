@@ -62,12 +62,9 @@ const createDefaultTeams = (): { teamA: Team; teamB: Team } => ({
   },
 });
 
-export default function MatchTimeline({ sets: initialSets = [] }: { sets?: SetInfo[] }) {
-  // 초기 세트가 없으면 기본 세트 생성
+export default function MatchTimeline() {
+  // 기본 세트 생성
   const [sets, setSets] = useState<SetInfo[]>(() => {
-    if (initialSets.length > 0) {
-      return initialSets;
-    }
     const { teamA, teamB } = createDefaultTeams();
     return [
       {
@@ -80,13 +77,8 @@ export default function MatchTimeline({ sets: initialSets = [] }: { sets?: SetIn
 
   const [selectedSetIndex, setSelectedSetIndex] = useState(0);
   
-  // timeline 초기화 수정
-  const [timeline, setTimeline] = useState<string[][]>(() => {
-    if (initialSets.length > 0) {
-      return initialSets.map(() => []);
-    }
-    return [[]]; // 기본 세트 1개에 대한 빈 타임라인
-  });
+  // timeline 초기화
+  const [timeline, setTimeline] = useState<string[][]>([[]]);  // 기본 세트 1개에 대한 빈 타임라인
 
   const [selectedScorer, setSelectedScorer] = useState<string>("");
   const [selectedAssist, setSelectedAssist] = useState<string>("");
