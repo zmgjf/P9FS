@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectItem, SelectContent, SelectValue } from "@/components/ui/select";
@@ -21,13 +23,16 @@ interface SetInfo {
   teamB: Team;
 }
 
-const MatchTimeline: React.FC<{ setInfo: SetInfo }> = ({ setInfo }) => {
-  const [timeline, setTimeline] = useState<string[]>([]);
+const MatchTimeline: React.FC<{ sets: SetInfo[] }> = ({ sets }) => {
+  const [selectedSetIndex, setSelectedSetIndex] = useState(0);
+  const selectedSet = sets[selectedSetIndex];
+
+  const [timeline, setTimeline] = useState<string[][]>(sets.map(() => []));
   const [selectedScorer, setSelectedScorer] = useState<string>("");
   const [selectedAssist, setSelectedAssist] = useState<string>("");
   const [eventType, setEventType] = useState<"goal" | "assist" | "ownGoal">("goal");
 
-  const allPlayers = [...setInfo.teamA.members, ...setInfo.teamB.members];
+  const allPlayers = [...selectedSet.teamA.members, ...selectedSet.teamB.members];
 
   const handleRecord = () => {
     const scorer = allPlayers.find((p) => p.id === selectedScorer);
@@ -43,13 +48,31 @@ const MatchTimeline: React.FC<{ setInfo: SetInfo }> = ({ setInfo }) => {
       text = `${scorer?.name} (${scorer?.number}) 자책골`;
     }
 
-    setTimeline((prev) => [...prev, `${time} - ${text}`]);
+    const updatedTimeline = [...timeline];
+    updatedTimeline[selectedSetIndex].push(`${time} - ${text}`);
+    setTimeline(updatedTimeline);
     setSelectedScorer("");
     setSelectedAssist("");
   };
 
   return (
     <div className="p-4 space-y-4">
+      <Card>
+        <CardContent className="p-4 space-y-4">
+          <h2 className="text-xl font-bold">세트 선택</h2>
+          <Select value={String(selectedSetIndex)} onValueChange={(v) => setSelectedSetIndex(Number(v))}>
+            <SelectTrigger className="w-60">
+              <SelectValue placeholder="세트를 선택하세요" />
+            </SelectTrigger>
+            <SelectContent>
+              {sets.map((s, idx) => (
+                <SelectItem key={idx} value={String(idx)}>{`${idx + 1}세트: ${s.teamA.name} vs ${s.teamB.name}`}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardContent className="p-4 space-y-4">
           <h2 className="text-xl font-bold">경기 이벤트 기록</h2>
@@ -98,7 +121,7 @@ const MatchTimeline: React.FC<{ setInfo: SetInfo }> = ({ setInfo }) => {
         <CardContent className="p-4">
           <h2 className="text-lg font-semibold mb-2">타임라인</h2>
           <div className="space-y-1 max-h-64 overflow-y-auto">
-            {timeline.map((line, idx) => (
+            {timeline[selectedSetIndex].map((line, idx) => (
               <div key={idx} className="text-sm border-b py-1">
                 {line}
               </div>
