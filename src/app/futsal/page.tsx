@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectItem, SelectContent, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { v4 as uuidv4 } from 'uuid';
 
 interface Member {
   id: string;
@@ -32,8 +31,8 @@ const MatchTimeline: React.FC<{ sets?: SetInfo[] }> = ({ sets: initialSets = [] 
 
   const selectedSet = sets[selectedSetIndex] ?? {
     name: "세트 1",
-    teamA: { id: uuidv4(), name: "팀 A", members: [] },
-    teamB: { id: uuidv4(), name: "팀 B", members: [] },
+    teamA: { id: Date.now().toString(), name: "팀 A", members: [] },
+    teamB: { id: (Date.now() + 1).toString(), name: "팀 B", members: [] },
   };
 
   const [timeline, setTimeline] = useState<string[][]>(initialSets.map(() => []));
@@ -70,8 +69,8 @@ const MatchTimeline: React.FC<{ sets?: SetInfo[] }> = ({ sets: initialSets = [] 
   const handleAddSet = () => {
     const newSet: SetInfo = {
       name: `세트 ${sets.length + 1}`,
-      teamA: { id: uuidv4(), name: "팀 A", members: [] },
-      teamB: { id: uuidv4(), name: "팀 B", members: [] },
+      teamA: { id: Date.now().toString(), name: "팀 A", members: [] },
+      teamB: { id: (Date.now() + 1).toString(), name: "팀 B", members: [] },
     };
     setSets((prev) => [...prev, newSet]);
     setTimeline((prev) => [...prev, []]);
