@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
-interface Member {
+interface Player {
   id: string;
   name: string;
   number: number;
@@ -11,328 +11,639 @@ interface Member {
 interface Team {
   id: string;
   name: string;
-  members: Member[];
+  players: Player[];
 }
 
-interface SetInfo {
+interface GameSet {
+  id: string;
   name: string;
+  duration: number; // 분 단위
   teamA: Team;
   teamB: Team;
+  isActive: boolean;
+  startTime?: number;
+  events: GameEvent[];
 }
 
-type EventType = "goal" | "assist" | "ownGoal";
+interface GameEvent {
+  id: string;
+  time: string;
+  realTime: number; // 실제 경과 시간 (초)
+  type: 'goal' | 'assist' | 'ownGoal';
+  player: Player;
+  assistPlayer?: Player;
+  team: 'A' | 'B';
+}
 
-// UUID 생성 함수
-const generateId = () => {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
-};
+type GamePhase = 'setup' | 'teamSetup' | 'playing' | 'paused' | 'finished';
+type ActionMode = 'none' | 'goal' | 'assist' | 'ownGoal';
 
-// 기본 플레이어 데이터
-const createDefaultTeams = (): { teamA: Team; teamB: Team } => ({
-  teamA: {
-    id: generateId(),
-    name: "팀 A",
-    members: [
-      { id: generateId(), name: "선수1", number: 1 },
-      { id: generateId(), name: "선수2", number: 2 },
-      { id: generateId(), name: "선수3", number: 3 },
-      { id: generateId(), name: "선수4", number: 4 },
-      { id: generateId(), name: "선수5", number: 5 },
-    ],
-  },
-  teamB: {
-    id: generateId(),
-    name: "팀 B",
-    members: [
-      { id: generateId(), name: "선수6", number: 6 },
-      { id: generateId(), name: "선수7", number: 7 },
-      { id: generateId(), name: "선수8", number: 8 },
-      { id: generateId(), name: "선수9", number: 9 },
-      { id: generateId(), name: "선수10", number: 10 },
-    ],
-  },
-});
+const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
 
-export default function MatchTimeline() {
-  // 기본 세트 생성
-  const [sets, setSets] = useState<SetInfo[]>(() => {
-    const { teamA, teamB } = createDefaultTeams();
-    return [
-      {
-        name: "세트 1",
-        teamA,
-        teamB,
-      },
-    ];
-  });
+export default function FutsalManager() {
+  const [gamePhase, setGamePhase] = useState<GamePhase>('setup');
+  const [actionMode, setActionMode] = useState<ActionMode>('none');
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [assistPlayer, setAssistPlayer] = useState<Player | null>(null);
+  
+  const [sets, setSets] = useState<GameSet[]>([]);
+  const [currentSetIndex, setCurrentSetIndex] = useState(0);
+  const [gameTime, setGameTime] = useState(0); // 경과 시간 (초)
+  
+  // 새 세트 생성
+  const [newSetName, setNewSetName] = useState('');
+  const [newSetDuration, setNewSetDuration] = useState(10);
+  const [teamAName, setTeamAName] = useState('');
+  const [teamBName, setTeamBName] = useState('');
+  const [teamAPlayers, setTeamAPlayers] = useState<Player[]>([]);
+  const [teamBPlayers, setTeamBPlayers] = useState<Player[]>([]);
 
-  const [selectedSetIndex, setSelectedSetIndex] = useState(0);
-  const [timeline, setTimeline] = useState<string[][]>([[]]);
-  const [selectedScorer, setSelectedScorer] = useState<string>("");
-  const [selectedAssist, setSelectedAssist] = useState<string>("");
-  const [eventType, setEventType] = useState<EventType>("goal");
+  const currentSet = sets[currentSetIndex];
 
-  const selectedSet = sets[selectedSetIndex];
-  const allPlayers = selectedSet ? [...selectedSet.teamA.members, ...selectedSet.teamB.members] : [];
-
-  const handleRecord = () => {
-    // 유효성 검사
-    if (!selectedScorer) {
-      alert("득점자를 선택해주세요.");
-      return;
+  // 게임 타이머
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (gamePhase === 'playing' && currentSet) {
+      interval = setInterval(() => {
+        setGameTime(prev => {
+          const newTime = prev + 1;
+          if (newTime >= currentSet.duration * 60) {
+            setGamePhase('finished');
+            return currentSet.duration * 60;
+          }
+          return newTime;
+        });
+      }, 1000);
     }
+    return () => clearInterval(interval);
+  }, [gamePhase, currentSet]);
 
-    const scorer = allPlayers.find((p) => p.id === selectedScorer);
-    const assist = selectedAssist ? allPlayers.find((p) => p.id === selectedAssist) : null;
+  // 플레이어 추가
+  const addPlayer = (team: 'A' | 'B') => {
+    const name = prompt(`${team === 'A' ? teamAName : teamBName} 선수 이름을 입력하세요:`);
+    if (!name) return;
     
-    if (!scorer) {
-      alert("선택된 득점자가 유효하지 않습니다.");
+    const number = parseInt(prompt('등번호를 입력하세요:') || '0');
+    if (!number) return;
+
+    const newPlayer: Player = {
+      id: generateId(),
+      name,
+      number
+    };
+
+    if (team === 'A') {
+      setTeamAPlayers(prev => [...prev, newPlayer]);
+    } else {
+      setTeamBPlayers(prev => [...prev, newPlayer]);
+    }
+  };
+
+  // 세트 생성
+  const createSet = () => {
+    if (!newSetName || !teamAName || !teamBName || teamAPlayers.length === 0 || teamBPlayers.length === 0) {
+      alert('모든 정보를 입력해주세요.');
       return;
     }
 
-    const time = new Date().toLocaleTimeString();
-
-    let text = "";
-    if (eventType === "goal") {
-      text = `${scorer.name} (${scorer.number}) 골!${assist ? ` 도움: ${assist.name} (${assist.number})` : ""}`;
-    } else if (eventType === "assist") {
-      if (!assist) {
-        alert("어시스트 선수를 선택해주세요.");
-        return;
-      }
-      text = `${assist.name} (${assist.number}) 어시스트 기록`;
-    } else {
-      text = `${scorer.name} (${scorer.number}) 자책골`;
-    }
-
-    setTimeline((prev) => {
-      const newTimeline = [...prev];
-      if (!newTimeline[selectedSetIndex]) {
-        newTimeline[selectedSetIndex] = [];
-      }
-      newTimeline[selectedSetIndex] = [...newTimeline[selectedSetIndex], `${time} - ${text}`];
-      return newTimeline;
-    });
-
-    // 입력 필드 초기화
-    setSelectedScorer("");
-    setSelectedAssist("");
-  };
-
-  const handleAddSet = () => {
-    const { teamA, teamB } = createDefaultTeams();
-    const newSet: SetInfo = {
-      name: `세트 ${sets.length + 1}`,
-      teamA,
-      teamB,
+    const newSet: GameSet = {
+      id: generateId(),
+      name: newSetName,
+      duration: newSetDuration,
+      teamA: {
+        id: generateId(),
+        name: teamAName,
+        players: teamAPlayers
+      },
+      teamB: {
+        id: generateId(),
+        name: teamBName,
+        players: teamBPlayers
+      },
+      isActive: false,
+      events: []
     };
-    setSets((prev) => [...prev, newSet]);
-    setTimeline((prev) => [...prev, []]);
-    setSelectedSetIndex(sets.length);
+
+    setSets(prev => [...prev, newSet]);
+    
+    // 초기화
+    setNewSetName('');
+    setTeamAName('');
+    setTeamBName('');
+    setTeamAPlayers([]);
+    setTeamBPlayers([]);
+    setGamePhase('setup');
   };
 
-  const selectStyle = {
-    width: '200px',
-    padding: '8px 12px',
-    fontSize: '14px',
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    backgroundColor: 'white',
-    cursor: 'pointer'
+  // 게임 시작
+  const startGame = () => {
+    if (!currentSet) return;
+    
+    setSets(prev => prev.map((set, idx) => 
+      idx === currentSetIndex 
+        ? { ...set, isActive: true, startTime: Date.now() }
+        : set
+    ));
+    setGameTime(0);
+    setGamePhase('playing');
   };
 
-  const buttonStyle = {
-    padding: '8px 16px',
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500'
+  // 게임 일시정지/재개
+  const togglePause = () => {
+    setGamePhase(prev => prev === 'playing' ? 'paused' : 'playing');
   };
 
-  const cardStyle = {
-    border: '1px solid #e5e7eb',
-    borderRadius: '8px',
-    padding: '20px',
-    marginBottom: '20px',
-    backgroundColor: 'white',
-    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+  // 플레이어 클릭 처리
+  const handlePlayerClick = (player: Player, team: 'A' | 'B') => {
+    if (gamePhase !== 'playing') return;
+
+    if (actionMode === 'goal' || actionMode === 'ownGoal') {
+      if (!selectedPlayer) {
+        setSelectedPlayer(player);
+        if (actionMode === 'ownGoal') {
+          recordEvent(actionMode, player, team);
+        }
+      }
+    } else if (actionMode === 'assist') {
+      if (selectedPlayer && !assistPlayer) {
+        setAssistPlayer(player);
+        recordEvent('goal', selectedPlayer, team, player);
+      }
+    }
   };
 
-  return (
-    <div style={{ 
-      padding: '20px', 
-      maxWidth: '900px', 
-      margin: '0 auto',
-      backgroundColor: '#f9fafb',
-      minHeight: '100vh'
-    }}>
-      <h1 style={{ 
-        fontSize: '28px', 
-        fontWeight: 'bold', 
-        marginBottom: '30px',
-        textAlign: 'center',
-        color: '#111827'
-      }}>
-        ⚽ 풋살 경기 타임라인
-      </h1>
+  // 이벤트 기록
+  const recordEvent = (type: 'goal' | 'ownGoal', scorer: Player, team: 'A' | 'B', assist?: Player) => {
+    const minutes = Math.floor(gameTime / 60);
+    const seconds = gameTime % 60;
+    const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
-      {/* 세트 선택 */}
-      <div style={cardStyle}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          marginBottom: '16px'
-        }}>
-          <h2 style={{ fontSize: '20px', fontWeight: '600', margin: 0, color: '#374151' }}>
-            세트 선택
-          </h2>
+    const event: GameEvent = {
+      id: generateId(),
+      time: timeString,
+      realTime: gameTime,
+      type,
+      player: scorer,
+      assistPlayer: assist,
+      team
+    };
+
+    setSets(prev => prev.map((set, idx) => 
+      idx === currentSetIndex 
+        ? { ...set, events: [...set.events, event] }
+        : set
+    ));
+
+    // 초기화
+    setActionMode('none');
+    setSelectedPlayer(null);
+    setAssistPlayer(null);
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getScore = (team: 'A' | 'B') => {
+    if (!currentSet) return 0;
+    return currentSet.events.filter(event => 
+      event.type === 'goal' && event.team === team
+    ).length;
+  };
+
+  if (gamePhase === 'teamSetup' || (gamePhase === 'setup' && sets.length === 0)) {
+    return (
+      <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
+        <h1 style={{ textAlign: 'center', marginBottom: '30px' }}>⚽ 새 세트 만들기</h1>
+        
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
+          <h3>세트 정보</h3>
+          <div style={{ marginBottom: '10px' }}>
+            <label>세트 이름: </label>
+            <input 
+              type="text" 
+              value={newSetName}
+              onChange={(e) => setNewSetName(e.target.value)}
+              placeholder="예: 1세트"
+              style={{ marginLeft: '10px', padding: '5px' }}
+            />
+          </div>
+          <div style={{ marginBottom: '20px' }}>
+            <label>경기 시간: </label>
+            <input 
+              type="number" 
+              value={newSetDuration}
+              onChange={(e) => setNewSetDuration(parseInt(e.target.value))}
+              style={{ marginLeft: '10px', padding: '5px', width: '60px' }}
+            />
+            <span> 분</span>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '20px' }}>
+          {/* 팀 A */}
+          <div style={{ flex: 1, backgroundColor: '#fee', padding: '20px', borderRadius: '8px' }}>
+            <h3>팀 A</h3>
+            <input 
+              type="text" 
+              value={teamAName}
+              onChange={(e) => setTeamAName(e.target.value)}
+              placeholder="팀 이름"
+              style={{ width: '100%', padding: '5px', marginBottom: '10px' }}
+            />
+            <button onClick={() => addPlayer('A')} style={{ marginBottom: '10px' }}>
+              + 선수 추가
+            </button>
+            <div>
+              {teamAPlayers.map(player => (
+                <div key={player.id} style={{ padding: '5px', border: '1px solid #ccc', margin: '2px' }}>
+                  {player.number}번 {player.name}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 팀 B */}
+          <div style={{ flex: 1, backgroundColor: '#eef', padding: '20px', borderRadius: '8px' }}>
+            <h3>팀 B</h3>
+            <input 
+              type="text" 
+              value={teamBName}
+              onChange={(e) => setTeamBName(e.target.value)}
+              placeholder="팀 이름"
+              style={{ width: '100%', padding: '5px', marginBottom: '10px' }}
+            />
+            <button onClick={() => addPlayer('B')} style={{ marginBottom: '10px' }}>
+              + 선수 추가
+            </button>
+            <div>
+              {teamBPlayers.map(player => (
+                <div key={player.id} style={{ padding: '5px', border: '1px solid #ccc', margin: '2px' }}>
+                  {player.number}번 {player.name}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ textAlign: 'center', marginTop: '20px' }}>
           <button 
-            onClick={handleAddSet}
-            style={buttonStyle}
+            onClick={createSet}
+            style={{ 
+              padding: '10px 20px', 
+              backgroundColor: '#4CAF50', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '5px',
+              fontSize: '16px'
+            }}
           >
-            + 세트 추가
+            세트 생성
           </button>
         </div>
-        <select 
-          value={selectedSetIndex} 
-          onChange={(e) => setSelectedSetIndex(Number(e.target.value))}
-          style={{ ...selectStyle, width: '300px' }}
-        >
-          {sets.map((s, idx) => (
-            <option key={idx} value={idx}>
-              {`${idx + 1}세트: ${s.teamA.name} vs ${s.teamB.name}`}
-            </option>
-          ))}
-        </select>
       </div>
+    );
+  }
 
-      {/* 이벤트 기록 */}
-      <div style={cardStyle}>
-        <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '20px', color: '#374151' }}>
-          경기 이벤트 기록
-        </h2>
-        <div style={{ 
-          display: 'flex', 
-          gap: '12px', 
-          alignItems: 'center',
-          flexWrap: 'wrap'
-        }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '12px', fontWeight: '500', color: '#6b7280' }}>
-              이벤트 종류
-            </label>
+  return (
+    <div style={{ padding: '10px', maxWidth: '1200px', margin: '0 auto' }}>
+      {/* 헤더 */}
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        marginBottom: '20px',
+        backgroundColor: '#2c3e50',
+        color: 'white',
+        padding: '15px 20px',
+        borderRadius: '8px'
+      }}>
+        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+          {currentSet?.name || '세트 선택'}
+        </div>
+        <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
+          {formatTime(gameTime)} / {currentSet ? formatTime(currentSet.duration * 60) : '00:00'}
+        </div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={() => setGamePhase('teamSetup')}>새 세트</button>
+          {sets.length > 0 && (
             <select 
-              value={eventType} 
-              onChange={(e) => setEventType(e.target.value as EventType)}
-              style={{ ...selectStyle, width: '120px' }}
+              value={currentSetIndex} 
+              onChange={(e) => setCurrentSetIndex(parseInt(e.target.value))}
             >
-              <option value="goal">골</option>
-              <option value="assist">어시스트</option>
-              <option value="ownGoal">자책골</option>
-            </select>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '12px', fontWeight: '500', color: '#6b7280' }}>
-              득점자
-            </label>
-            <select 
-              value={selectedScorer} 
-              onChange={(e) => setSelectedScorer(e.target.value)}
-              style={selectStyle}
-            >
-              <option value="">선택하세요</option>
-              {allPlayers.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {`${p.number}번 ${p.name}`}
-                </option>
+              {sets.map((set, idx) => (
+                <option key={set.id} value={idx}>{set.name}</option>
               ))}
             </select>
-          </div>
-
-          {(eventType === "goal" || eventType === "assist") && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '12px', fontWeight: '500', color: '#6b7280' }}>
-                {eventType === "goal" ? "어시스트 (선택)" : "어시스트 선수"}
-              </label>
-              <select 
-                value={selectedAssist} 
-                onChange={(e) => setSelectedAssist(e.target.value)}
-                style={selectStyle}
-              >
-                <option value="">
-                  {eventType === "goal" ? "없음" : "선택하세요"}
-                </option>
-                {allPlayers.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {`${p.number}번 ${p.name}`}
-                  </option>
-                ))}
-              </select>
-            </div>
           )}
-
-          <div style={{ display: 'flex', alignItems: 'end', height: '100%' }}>
-            <button 
-              onClick={handleRecord} 
-              disabled={!selectedScorer}
-              style={{
-                ...buttonStyle,
-                backgroundColor: selectedScorer ? '#3b82f6' : '#9ca3af',
-                cursor: selectedScorer ? 'pointer' : 'not-allowed',
-                marginTop: '20px'
-              }}
-            >
-              📝 기록
-            </button>
-          </div>
         </div>
       </div>
 
-      {/* 타임라인 */}
-      <div style={cardStyle}>
-        <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px', color: '#374151' }}>
-          📋 타임라인 - {selectedSet?.name || ""}
-        </h2>
-        <div style={{ 
-          maxHeight: '400px', 
-          overflowY: 'auto',
-          border: '1px solid #e5e7eb',
-          borderRadius: '6px',
-          backgroundColor: '#f9fafb'
-        }}>
-          {timeline[selectedSetIndex]?.length ? (
-            timeline[selectedSetIndex].map((line, idx) => (
-              <div 
-                key={idx} 
+      {currentSet && (
+        <>
+          {/* 스코어보드 */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            backgroundColor: '#34495e',
+            color: 'white',
+            padding: '20px',
+            borderRadius: '8px',
+            marginBottom: '20px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              <div style={{ 
+                width: '60px', 
+                height: '60px', 
+                backgroundColor: '#e74c3c', 
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}></div>
+              <div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{currentSet.teamA.name}</div>
+              </div>
+            </div>
+            
+            <div style={{ fontSize: '48px', fontWeight: 'bold' }}>
+              {getScore('A')} : {getScore('B')}
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{currentSet.teamB.name}</div>
+              </div>
+              <div style={{ 
+                width: '60px', 
+                height: '60px', 
+                backgroundColor: '#3498db', 
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}></div>
+            </div>
+          </div>
+
+          {/* 게임 컨트롤 */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            gap: '10px', 
+            marginBottom: '20px' 
+          }}>
+            {gamePhase === 'setup' && (
+              <button 
+                onClick={startGame}
                 style={{ 
-                  padding: '12px 16px',
-                  borderBottom: idx < timeline[selectedSetIndex].length - 1 ? '1px solid #e5e7eb' : 'none',
-                  fontSize: '14px',
-                  backgroundColor: idx % 2 === 0 ? 'white' : '#f9fafb'
+                  padding: '10px 20px', 
+                  backgroundColor: '#27ae60', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '5px' 
                 }}
               >
-                {line}
-              </div>
-            ))
-          ) : (
+                게임 시작
+              </button>
+            )}
+            {(gamePhase === 'playing' || gamePhase === 'paused') && (
+              <button 
+                onClick={togglePause}
+                style={{ 
+                  padding: '10px 20px', 
+                  backgroundColor: gamePhase === 'playing' ? '#f39c12' : '#27ae60', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '5px' 
+                }}
+              >
+                {gamePhase === 'playing' ? '일시정지' : '재개'}
+              </button>
+            )}
+          </div>
+
+          {/* 액션 버튼들 */}
+          {gamePhase === 'playing' && (
             <div style={{ 
-              padding: '40px 20px',
-              textAlign: 'center',
-              color: '#6b7280',
-              fontSize: '14px'
+              display: 'flex', 
+              justifyContent: 'center', 
+              gap: '10px', 
+              marginBottom: '20px' 
             }}>
-              아직 기록된 이벤트가 없습니다.
-              <br />
-              위에서 득점자를 선택하고 기록 버튼을 눌러보세요!
+              <button 
+                onClick={() => setActionMode('goal')}
+                style={{ 
+                  padding: '10px 15px', 
+                  backgroundColor: actionMode === 'goal' ? '#e74c3c' : '#95a5a6',
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '5px' 
+                }}
+              >
+                ⚽ 골
+              </button>
+              <button 
+                onClick={() => setActionMode('assist')}
+                style={{ 
+                  padding: '10px 15px', 
+                  backgroundColor: actionMode === 'assist' ? '#e74c3c' : '#95a5a6',
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '5px' 
+                }}
+              >
+                🅰️ 어시스트
+              </button>
+              <button 
+                onClick={() => setActionMode('ownGoal')}
+                style={{ 
+                  padding: '10px 15px', 
+                  backgroundColor: actionMode === 'ownGoal' ? '#e74c3c' : '#95a5a6',
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '5px' 
+                }}
+              >
+                ⚫ 자책골
+              </button>
+              <button 
+                onClick={() => {
+                  setActionMode('none');
+                  setSelectedPlayer(null);
+                  setAssistPlayer(null);
+                }}
+                style={{ 
+                  padding: '10px 15px', 
+                  backgroundColor: '#7f8c8d',
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '5px' 
+                }}
+              >
+                취소
+              </button>
             </div>
           )}
-        </div>
-      </div>
+
+          {/* 풋살장 */}
+          <div style={{
+            backgroundColor: '#27ae60',
+            borderRadius: '10px',
+            padding: '20px',
+            marginBottom: '20px',
+            position: 'relative',
+            minHeight: '400px',
+            border: '3px solid white'
+          }}>
+            {/* 중앙선 */}
+            <div style={{
+              position: 'absolute',
+              left: '50%',
+              top: '0',
+              bottom: '0',
+              width: '3px',
+              backgroundColor: 'white',
+              transform: 'translateX(-50%)'
+            }}></div>
+            
+            {/* 중앙 원 */}
+            <div style={{
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              width: '100px',
+              height: '100px',
+              border: '3px solid white',
+              borderRadius: '50%',
+              transform: 'translate(-50%, -50%)'
+            }}></div>
+
+            {/* 팀 A 선수들 (왼쪽) */}
+            <div style={{ position: 'absolute', left: '10%', top: '20%', width: '30%', height: '60%' }}>
+              {currentSet.teamA.players.map((player, idx) => (
+                <div
+                  key={player.id}
+                  onClick={() => handlePlayerClick(player, 'A')}
+                  style={{
+                    position: 'absolute',
+                    left: `${(idx % 3) * 40}%`,
+                    top: `${Math.floor(idx / 3) * 50}%`,
+                    width: '60px',
+                    height: '60px',
+                    backgroundColor: selectedPlayer?.id === player.id ? '#f39c12' : '#e74c3c',
+                    color: 'white',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: gamePhase === 'playing' ? 'pointer' : 'default',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    border: '2px solid white',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                  }}
+                >
+                  <div>{player.number}</div>
+                  <div style={{ fontSize: '8px' }}>{player.name}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* 팀 B 선수들 (오른쪽) */}
+            <div style={{ position: 'absolute', right: '10%', top: '20%', width: '30%', height: '60%' }}>
+              {currentSet.teamB.players.map((player, idx) => (
+                <div
+                  key={player.id}
+                  onClick={() => handlePlayerClick(player, 'B')}
+                  style={{
+                    position: 'absolute',
+                    right: `${(idx % 3) * 40}%`,
+                    top: `${Math.floor(idx / 3) * 50}%`,
+                    width: '60px',
+                    height: '60px',
+                    backgroundColor: selectedPlayer?.id === player.id ? '#f39c12' : '#3498db',
+                    color: 'white',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: gamePhase === 'playing' ? 'pointer' : 'default',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    border: '2px solid white',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                  }}
+                >
+                  <div>{player.number}</div>
+                  <div style={{ fontSize: '8px' }}>{player.name}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 액션 안내 */}
+          {actionMode !== 'none' && gamePhase === 'playing' && (
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '10px', 
+              backgroundColor: '#f39c12', 
+              color: 'white', 
+              borderRadius: '5px',
+              marginBottom: '20px'
+            }}>
+              {actionMode === 'goal' && !selectedPlayer && '득점한 선수를 클릭하세요'}
+              {actionMode === 'goal' && selectedPlayer && '어시스트한 선수를 클릭하거나 취소를 누르세요'}
+              {actionMode === 'assist' && '어시스트한 선수를 클릭하세요'}
+              {actionMode === 'ownGoal' && '자책골한 선수를 클릭하세요'}
+            </div>
+          )}
+
+          {/* 이벤트 타임라인 */}
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '20px', 
+            borderRadius: '8px',
+            maxHeight: '300px',
+            overflowY: 'auto'
+          }}>
+            <h3>경기 기록</h3>
+            {currentSet.events.length === 0 ? (
+              <p style={{ color: '#7f8c8d' }}>아직 기록된 이벤트가 없습니다.</p>
+            ) : (
+              currentSet.events.map(event => (
+                <div key={event.id} style={{ 
+                  padding: '8px', 
+                  borderBottom: '1px solid #eee',
+                  display: 'flex',
+                  justifyContent: 'space-between'
+                }}>
+                  <span>
+                    <strong>{event.time}</strong> - 
+                    {event.type === 'goal' && ' ⚽ '}
+                    {event.type === 'ownGoal' && ' ⚫ '}
+                    <strong>{event.player.name} ({event.player.number})</strong>
+                    {event.type === 'goal' && ' 골'}
+                    {event.type === 'ownGoal' && ' 자책골'}
+                    {event.assistPlayer && ` | 어시스트: ${event.assistPlayer.name}`}
+                  </span>
+                  <span style={{ 
+                    color: event.team === 'A' ? '#e74c3c' : '#3498db',
+                    fontWeight: 'bold'
+                  }}>
+                    {event.team === 'A' ? currentSet.teamA.name : currentSet.teamB.name}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
