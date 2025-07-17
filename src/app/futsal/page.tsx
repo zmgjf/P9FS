@@ -387,6 +387,77 @@ export default function FutsalManager() {
     URL.revokeObjectURL(url);
   };
 
+  // 데이터 가져오기
+  const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const importedData = JSON.parse(e.target?.result as string);
+        
+        if (importedData.teams && importedData.matches) {
+          // 기존 데이터와 병합할지 물어보기
+          const shouldMerge = confirm(
+            '데이터를 가져오는 방법을 선택하세요:\n' +
+            'OK = 기존 데이터와 병합\n' + 
+            '취소 = 기존 데이터 삭제 후 교체'
+          );
+
+          if (shouldMerge) {
+            // 병합 (중복 체크)
+            const newTeams = [...teams];
+            const newMatches = [...matches];
+
+            importedData.teams.forEach((importedTeam: Team) => {
+              const exists = newTeams.some(team => team.name === importedTeam.name);
+              if (!exists) {
+                newTeams.push({
+                  ...importedTeam,
+                  id: generateId(), // 새 ID 생성
+                  createdAt: new Date().toISOString()
+                });
+              }
+            });
+
+            importedData.matches.forEach((importedMatch: Match) => {
+              const exists = newMatches.some(match => 
+                match.name === importedMatch.name && match.venue === importedMatch.venue
+              );
+              if (!exists) {
+                newMatches.push({
+                  ...importedMatch,
+                  id: generateId(), // 새 ID 생성
+                  createdAt: new Date().toISOString()
+                });
+              }
+            });
+
+            setTeams(newTeams);
+            setMatches(newMatches);
+          } else {
+            // 교체
+            setTeams(importedData.teams);
+            setMatches(importedData.matches);
+            setCurrentMatch(null);
+          }
+
+          alert('데이터를 성공적으로 가져왔습니다!');
+        } else {
+          alert('올바르지 않은 데이터 형식입니다.');
+        }
+      } catch (error) {
+        alert('파일을 읽는 중 오류가 발생했습니다.');
+        console.error('Import error:', error);
+      }
+    };
+    reader.readAsText(file);
+    
+    // 파일 input 초기화
+    event.target.value = '';
+  };
+
   // 헤더 컴포넌트
   const renderHeader = () => currentMatch && (
     <div style={{ 
@@ -506,21 +577,44 @@ export default function FutsalManager() {
           </button>
         </div>
 
-        <div>
+                  <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h2>경기 기록</h2>
-            <button 
-              onClick={exportData}
-              style={{ 
-                padding: '8px 16px', 
-                backgroundColor: '#27ae60', 
-                color: 'white', 
-                border: 'none', 
-                borderRadius: '4px' 
-              }}
-            >
-              📥 데이터 내보내기
-            </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <input
+                type="file"
+                accept=".json"
+                onChange={importData}
+                style={{ display: 'none' }}
+                id="import-file"
+              />
+              <label
+                htmlFor="import-file"
+                style={{ 
+                  padding: '8px 16px', 
+                  backgroundColor: '#3498db', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                📁 데이터 가져오기
+              </label>
+              <button 
+                onClick={exportData}
+                style={{ 
+                  padding: '8px 16px', 
+                  backgroundColor: '#27ae60', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '4px' 
+                }}
+              >
+                📥 데이터 내보내기
+              </button>
+            </div>
           </div>
           
           {matches.length === 0 ? (
