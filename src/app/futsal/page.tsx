@@ -143,7 +143,8 @@ export default function FutsalManager() {
       date: new Date().toLocaleDateString('ko-KR'),
       sets: [],
       createdAt: new Date().toISOString()
-    };
+    // 데이터 가져오기
+  const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
 
     setCurrentMatch(newMatch);
     setMatches(prev => [...prev, newMatch]);
@@ -387,8 +388,57 @@ export default function FutsalManager() {
     URL.revokeObjectURL(url);
   };
 
-  // 데이터 가져오기
-  const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // 세트 삭제
+  const deleteSet = (setIndex: number) => {
+    if (!currentMatch) return;
+    
+    if (confirm('정말 이 세트를 삭제하시겠습니까? 모든 경기 기록이 함께 삭제됩니다.')) {
+      const updatedSets = currentMatch.sets.filter((_, idx) => idx !== setIndex);
+      const updatedMatch = { ...currentMatch, sets: updatedSets };
+      
+      setCurrentMatch(updatedMatch);
+      setMatches(prev => prev.map(m => m.id === currentMatch.id ? updatedMatch : m));
+      
+      // 현재 세트 인덱스 조정
+      if (setIndex === currentSetIndex && updatedSets.length > 0) {
+        setCurrentSetIndex(Math.max(0, setIndex - 1));
+      } else if (updatedSets.length === 0) {
+        setCurrentSetIndex(0);
+        setAppPhase('setSetup');
+      }
+    }
+  };
+
+  // 경기 기록 삭제
+  const deleteEvent = (eventId: string) => {
+    if (!currentMatch || !currentSet) return;
+    
+    if (confirm('이 기록을 삭제하시겠습니까?')) {
+      const updatedSets = currentMatch.sets.map((set, idx) => 
+        idx === currentSetIndex 
+          ? { ...set, events: set.events.filter(event => event.id !== eventId) }
+          : set
+      );
+
+      const updatedMatch = { ...currentMatch, sets: updatedSets };
+      setCurrentMatch(updatedMatch);
+      setMatches(prev => prev.map(m => m.id === currentMatch.id ? updatedMatch : m));
+    }
+  };
+
+  // 매치 삭제
+  const deleteMatch = (matchId: string) => {
+    if (confirm('정말 이 경기를 삭제하시겠습니까? 모든 세트와 기록이 함께 삭제됩니다.')) {
+      setMatches(prev => prev.filter(m => m.id !== matchId));
+      
+      // 현재 매치가 삭제된 경우
+      if (currentMatch?.id === matchId) {
+        setCurrentMatch(null);
+        localStorage.removeItem('futsal_current_match');
+        setAppPhase('matchManagement');
+      }
+    }
+  };
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -634,22 +684,41 @@ export default function FutsalManager() {
                   backgroundColor: 'white', 
                   padding: '20px', 
                   borderRadius: '8px',
-                  border: '1px solid #ddd',
-                  cursor: 'pointer'
-                }}
-                onClick={() => {
-                  setCurrentMatch(match);
-                  setAppPhase('setSetup');
+                  border: '1px solid #ddd'
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
+                    <div 
+                      style={{ flex: 1, cursor: 'pointer' }}
+                      onClick={() => {
+                        setCurrentMatch(match);
+                        setAppPhase('setSetup');
+                      }}
+                    >
                       <h3 style={{ margin: '0 0 5px 0' }}>{match.name}</h3>
                       <p style={{ margin: '0', color: '#666' }}>{match.venue} | {match.date}</p>
                       <p style={{ margin: '5px 0 0 0', fontSize: '14px', color: '#999' }}>
                         {match.sets.length}개 세트
                       </p>
                     </div>
-                    <div style={{ fontSize: '20px' }}>⚽</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ fontSize: '20px' }}>⚽</div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteMatch(match.id);
+                        }}
+                        style={{ 
+                          padding: '4px 8px', 
+                          backgroundColor: '#e74c3c', 
+                          color: 'white', 
+                          border: 'none', 
+                          borderRadius: '4px',
+                          fontSize: '12px'
+                        }}
+                      >
+                        삭제
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -942,15 +1011,16 @@ export default function FutsalManager() {
                   backgroundColor: 'white', 
                   padding: '15px', 
                   borderRadius: '8px',
-                  border: '1px solid #ddd',
-                  cursor: 'pointer'
-                }}
-                onClick={() => {
-                  setCurrentSetIndex(idx);
-                  setAppPhase('gameReady');
+                  border: '1px solid #ddd'
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
+                    <div 
+                      style={{ flex: 1, cursor: 'pointer' }}
+                      onClick={() => {
+                        setCurrentSetIndex(idx);
+                        setAppPhase('gameReady');
+                      }}
+                    >
                       <h4 style={{ margin: '0 0 5px 0' }}>{set.name}</h4>
                       <p style={{ margin: '0', fontSize: '14px', color: '#666' }}>
                         {set.teamA.name} vs {set.teamB.name} | {set.duration}분
@@ -961,8 +1031,26 @@ export default function FutsalManager() {
                         </p>
                       )}
                     </div>
-                    <div style={{ fontSize: '16px' }}>
-                      {set.completedAt ? '✅' : (set.isActive ? '🔄' : '⏸️')}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ fontSize: '16px' }}>
+                        {set.completedAt ? '✅' : (set.isActive ? '🔄' : '⏸️')}
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteSet(idx);
+                        }}
+                        style={{ 
+                          padding: '4px 8px', 
+                          backgroundColor: '#e74c3c', 
+                          color: 'white', 
+                          border: 'none', 
+                          borderRadius: '4px',
+                          fontSize: '12px'
+                        }}
+                      >
+                        삭제
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1352,9 +1440,10 @@ export default function FutsalManager() {
               padding: '8px', 
               borderBottom: '1px solid #eee',
               display: 'flex',
-              justifyContent: 'space-between'
+              justifyContent: 'space-between',
+              alignItems: 'center'
             }}>
-              <span>
+              <span style={{ flex: 1 }}>
                 <strong>{event.time}</strong> - 
                 {event.type === 'goal' && ' ⚽ '}
                 {event.type === 'ownGoal' && ' ⚫ '}
@@ -1363,12 +1452,31 @@ export default function FutsalManager() {
                 {event.type === 'ownGoal' && ' 자책골'}
                 {event.assistPlayer && ` | 어시스트: ${event.assistPlayer.name}`}
               </span>
-              <span style={{ 
-                color: event.team === 'A' ? '#e74c3c' : '#3498db',
-                fontWeight: 'bold'
-              }}>
-                {event.team === 'A' ? currentSet.teamA.name : currentSet.teamB.name}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ 
+                  color: event.team === 'A' ? '#e74c3c' : '#3498db',
+                  fontWeight: 'bold',
+                  minWidth: '80px',
+                  textAlign: 'right'
+                }}>
+                  {event.team === 'A' ? currentSet.teamA.name : currentSet.teamB.name}
+                </span>
+                {appPhase !== 'finished' && (
+                  <button
+                    onClick={() => deleteEvent(event.id)}
+                    style={{ 
+                      padding: '2px 6px', 
+                      backgroundColor: '#e74c3c', 
+                      color: 'white', 
+                      border: 'none', 
+                      borderRadius: '3px',
+                      fontSize: '10px'
+                    }}
+                  >
+                    삭제
+                  </button>
+                )}
+              </div>
             </div>
           ))
         )}
