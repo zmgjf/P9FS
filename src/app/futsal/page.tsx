@@ -143,8 +143,7 @@ export default function FutsalManager() {
       date: new Date().toLocaleDateString('ko-KR'),
       sets: [],
       createdAt: new Date().toISOString()
-    // 데이터 가져오기
-  const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    };
 
     setCurrentMatch(newMatch);
     setMatches(prev => [...prev, newMatch]);
@@ -152,6 +151,9 @@ export default function FutsalManager() {
     setNewMatchVenue('');
     setAppPhase('teamManagement');
   };
+
+  // 데이터 가져오기
+  const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
 
   // 팀 관리
   const createTeam = () => {
