@@ -81,6 +81,7 @@ export default function FutsalManager() {
 
   const currentSet = currentMatch?.sets[currentSetIndex];
 
+  // 유틸리티 함수들
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -121,7 +122,6 @@ export default function FutsalManager() {
 
   // 로컬 스토리지 저장/로드
   useEffect(() => {
-    // 데이터 로드
     const savedTeams = localStorage.getItem('futsal_teams');
     const savedMatches = localStorage.getItem('futsal_matches');
     const savedCurrentMatch = localStorage.getItem('futsal_current_match');
@@ -167,7 +167,7 @@ export default function FutsalManager() {
     return () => clearInterval(interval);
   }, [appPhase, currentSet]);
 
-  // 매치 생성
+  // 매치 관리
   const createMatch = () => {
     if (!newMatchName.trim() || !newMatchVenue.trim()) {
       alert('경기명과 구장명을 입력하세요.');
@@ -189,9 +189,6 @@ export default function FutsalManager() {
     setNewMatchVenue('');
     setAppPhase('teamManagement');
   };
-
-  // 데이터 가져오기
-  const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
 
   // 팀 관리
   const createTeam = () => {
@@ -289,10 +286,7 @@ export default function FutsalManager() {
     setAppPhase('gameReady');
   };
 
-  const togglePause = () => {
-    setAppPhase(prev => prev === 'playing' ? 'paused' : 'playing');
-  };
-
+  // 게임 제어
   const startGame = () => {
     if (!currentSet || !currentMatch) return;
     
@@ -310,6 +304,11 @@ export default function FutsalManager() {
     setAppPhase('playing');
   };
 
+  const togglePause = () => {
+    setAppPhase(prev => prev === 'playing' ? 'paused' : 'playing');
+  };
+
+  // 이벤트 기록
   const recordEvent = (type: 'goal' | 'ownGoal', scorer: Player, team: 'A' | 'B', assist?: Player) => {
     if (!currentMatch || !currentSet) return;
 
@@ -341,7 +340,6 @@ export default function FutsalManager() {
     setSelectedPlayer(null);
   };
 
-  // 이벤트 처리
   const handlePlayerClick = (player: Player, team: 'A' | 'B') => {
     if (appPhase !== 'playing') return;
 
@@ -370,6 +368,7 @@ export default function FutsalManager() {
     recordEvent('goal', selectedPlayer, team, assistPlayer);
   };
 
+  // 데이터 관리
   const exportData = () => {
     const data = {
       teams,
@@ -390,107 +389,7 @@ export default function FutsalManager() {
     URL.revokeObjectURL(url);
   };
 
-  // 삭제 함수들
-  const deleteMatch = (matchId: string) => {
-    if (confirm('정말 이 경기를 삭제하시겠습니까? 모든 세트와 기록이 함께 삭제됩니다.')) {
-      setMatches(prev => prev.filter(m => m.id !== matchId));
-      
-      // 현재 매치가 삭제된 경우
-      if (currentMatch?.id === matchId) {
-        setCurrentMatch(null);
-        localStorage.removeItem('futsal_current_match');
-        setAppPhase('matchManagement');
-      }
-    }
-  };
-
-  const deleteSet = (setIndex: number) => {
-    if (!currentMatch) return;
-    
-    if (confirm('정말 이 세트를 삭제하시겠습니까? 모든 경기 기록이 함께 삭제됩니다.')) {
-      const updatedSets = currentMatch.sets.filter((_, idx) => idx !== setIndex);
-      const updatedMatch = { ...currentMatch, sets: updatedSets };
-      
-      setCurrentMatch(updatedMatch);
-      setMatches(prev => prev.map(m => m.id === currentMatch.id ? updatedMatch : m));
-      
-      // 현재 세트 인덱스 조정
-      if (setIndex === currentSetIndex && updatedSets.length > 0) {
-        setCurrentSetIndex(Math.max(0, setIndex - 1));
-      } else if (updatedSets.length === 0) {
-        setCurrentSetIndex(0);
-        setAppPhase('setSetup');
-      }
-    }
-  };
-
-  const deleteEvent = (eventId: string) => {
-    if (!currentMatch || !currentSet) return;
-    
-    if (confirm('이 기록을 삭제하시겠습니까?')) {
-      const updatedSets = currentMatch.sets.map((set, idx) => 
-        idx === currentSetIndex 
-          ? { ...set, events: set.events.filter(event => event.id !== eventId) }
-          : set
-      );
-
-      const updatedMatch = { ...currentMatch, sets: updatedSets };
-      setCurrentMatch(updatedMatch);
-      setMatches(prev => prev.map(m => m.id === currentMatch.id ? updatedMatch : m));
-    }
-  };
-
-  // 세트 삭제
-  const deleteSet = (setIndex: number) => {
-    if (!currentMatch) return;
-    
-    if (confirm('정말 이 세트를 삭제하시겠습니까? 모든 경기 기록이 함께 삭제됩니다.')) {
-      const updatedSets = currentMatch.sets.filter((_, idx) => idx !== setIndex);
-      const updatedMatch = { ...currentMatch, sets: updatedSets };
-      
-      setCurrentMatch(updatedMatch);
-      setMatches(prev => prev.map(m => m.id === currentMatch.id ? updatedMatch : m));
-      
-      // 현재 세트 인덱스 조정
-      if (setIndex === currentSetIndex && updatedSets.length > 0) {
-        setCurrentSetIndex(Math.max(0, setIndex - 1));
-      } else if (updatedSets.length === 0) {
-        setCurrentSetIndex(0);
-        setAppPhase('setSetup');
-      }
-    }
-  };
-
-  // 경기 기록 삭제
-  const deleteEvent = (eventId: string) => {
-    if (!currentMatch || !currentSet) return;
-    
-    if (confirm('이 기록을 삭제하시겠습니까?')) {
-      const updatedSets = currentMatch.sets.map((set, idx) => 
-        idx === currentSetIndex 
-          ? { ...set, events: set.events.filter(event => event.id !== eventId) }
-          : set
-      );
-
-      const updatedMatch = { ...currentMatch, sets: updatedSets };
-      setCurrentMatch(updatedMatch);
-      setMatches(prev => prev.map(m => m.id === currentMatch.id ? updatedMatch : m));
-    }
-  };
-
-  // 매치 삭제
-  const deleteMatch = (matchId: string) => {
-    if (confirm('정말 이 경기를 삭제하시겠습니까? 모든 세트와 기록이 함께 삭제됩니다.')) {
-      setMatches(prev => prev.filter(m => m.id !== matchId));
-      
-      // 현재 매치가 삭제된 경우
-      if (currentMatch?.id === matchId) {
-        setCurrentMatch(null);
-        localStorage.removeItem('futsal_current_match');
-        setAppPhase('matchManagement');
-      }
-    }
-  };
+  const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -500,7 +399,6 @@ export default function FutsalManager() {
         const importedData = JSON.parse(e.target?.result as string);
         
         if (importedData.teams && importedData.matches) {
-          // 기존 데이터와 병합할지 물어보기
           const shouldMerge = confirm(
             '데이터를 가져오는 방법을 선택하세요:\n' +
             'OK = 기존 데이터와 병합\n' + 
@@ -508,7 +406,6 @@ export default function FutsalManager() {
           );
 
           if (shouldMerge) {
-            // 병합 (중복 체크)
             const newTeams = [...teams];
             const newMatches = [...matches];
 
@@ -517,7 +414,7 @@ export default function FutsalManager() {
               if (!exists) {
                 newTeams.push({
                   ...importedTeam,
-                  id: generateId(), // 새 ID 생성
+                  id: generateId(),
                   createdAt: new Date().toISOString()
                 });
               }
@@ -530,7 +427,7 @@ export default function FutsalManager() {
               if (!exists) {
                 newMatches.push({
                   ...importedMatch,
-                  id: generateId(), // 새 ID 생성
+                  id: generateId(),
                   createdAt: new Date().toISOString()
                 });
               }
@@ -539,7 +436,6 @@ export default function FutsalManager() {
             setTeams(newTeams);
             setMatches(newMatches);
           } else {
-            // 교체
             setTeams(importedData.teams);
             setMatches(importedData.matches);
             setCurrentMatch(null);
@@ -556,28 +452,55 @@ export default function FutsalManager() {
     };
     reader.readAsText(file);
     
-    // 파일 input 초기화
     event.target.value = '';
   };
 
-  const exportData = () => {
-    const data = {
-      teams,
-      matches,
-      exportedAt: new Date().toISOString()
-    };
+  // 삭제 함수들
+  const deleteMatch = (matchId: string) => {
+    if (confirm('정말 이 경기를 삭제하시겠습니까? 모든 세트와 기록이 함께 삭제됩니다.')) {
+      setMatches(prev => prev.filter(m => m.id !== matchId));
+      
+      if (currentMatch?.id === matchId) {
+        setCurrentMatch(null);
+        localStorage.removeItem('futsal_current_match');
+        setAppPhase('matchManagement');
+      }
+    }
+  };
+
+  const deleteSet = (setIndex: number) => {
+    if (!currentMatch) return;
     
-    const dataStr = JSON.stringify(data, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
+    if (confirm('정말 이 세트를 삭제하시겠습니까? 모든 경기 기록이 함께 삭제됩니다.')) {
+      const updatedSets = currentMatch.sets.filter((_, idx) => idx !== setIndex);
+      const updatedMatch = { ...currentMatch, sets: updatedSets };
+      
+      setCurrentMatch(updatedMatch);
+      setMatches(prev => prev.map(m => m.id === currentMatch.id ? updatedMatch : m));
+      
+      if (setIndex === currentSetIndex && updatedSets.length > 0) {
+        setCurrentSetIndex(Math.max(0, setIndex - 1));
+      } else if (updatedSets.length === 0) {
+        setCurrentSetIndex(0);
+        setAppPhase('setSetup');
+      }
+    }
+  };
+
+  const deleteEvent = (eventId: string) => {
+    if (!currentMatch || !currentSet) return;
     
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `futsal_data_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    if (confirm('이 기록을 삭제하시겠습니까?')) {
+      const updatedSets = currentMatch.sets.map((set, idx) => 
+        idx === currentSetIndex 
+          ? { ...set, events: set.events.filter(event => event.id !== eventId) }
+          : set
+      );
+
+      const updatedMatch = { ...currentMatch, sets: updatedSets };
+      setCurrentMatch(updatedMatch);
+      setMatches(prev => prev.map(m => m.id === currentMatch.id ? updatedMatch : m));
+    }
   };
 
   // 헤더 컴포넌트
@@ -699,7 +622,7 @@ export default function FutsalManager() {
           </button>
         </div>
 
-                  <div>
+        <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h2>경기 기록</h2>
             <div style={{ display: 'flex', gap: '10px' }}>
@@ -1332,7 +1255,7 @@ export default function FutsalManager() {
         </div>
       )}
 
-      {/* 골 기록 확인 버튼들 (골 선택자가 선택된 경우) */}
+      {/* 골 기록 확인 버튼들 */}
       {selectedPlayer && actionMode === 'goal' && appPhase === 'playing' && (
         <div style={{ 
           backgroundColor: '#f39c12', 
