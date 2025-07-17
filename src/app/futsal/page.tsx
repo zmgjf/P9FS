@@ -1,15 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectTrigger,
-  SelectItem,
-  SelectContent,
-  SelectValue,
-} from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
 
 interface Member {
   id: string;
@@ -31,7 +22,7 @@ interface SetInfo {
 
 type EventType = "goal" | "assist" | "ownGoal";
 
-// UUID 생성 함수 (uuid 패키지 의존성 제거)
+// UUID 생성 함수
 const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
@@ -76,10 +67,7 @@ export default function MatchTimeline() {
   });
 
   const [selectedSetIndex, setSelectedSetIndex] = useState(0);
-  
-  // timeline 초기화
-  const [timeline, setTimeline] = useState<string[][]>([[]]);  // 기본 세트 1개에 대한 빈 타임라인
-
+  const [timeline, setTimeline] = useState<string[][]>([[]]);
   const [selectedScorer, setSelectedScorer] = useState<string>("");
   const [selectedAssist, setSelectedAssist] = useState<string>("");
   const [eventType, setEventType] = useState<EventType>("goal");
@@ -143,115 +131,208 @@ export default function MatchTimeline() {
     setSelectedSetIndex(sets.length);
   };
 
+  const selectStyle = {
+    width: '200px',
+    padding: '8px 12px',
+    fontSize: '14px',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    backgroundColor: 'white',
+    cursor: 'pointer'
+  };
+
+  const buttonStyle = {
+    padding: '8px 16px',
+    backgroundColor: '#3b82f6',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500'
+  };
+
+  const cardStyle = {
+    border: '1px solid #e5e7eb',
+    borderRadius: '8px',
+    padding: '20px',
+    marginBottom: '20px',
+    backgroundColor: 'white',
+    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+  };
+
   return (
-    <div className="p-4 space-y-4">
-      <Card>
-        <CardContent className="p-4 space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold">세트 선택</h2>
-            <Button onClick={handleAddSet}>세트 추가</Button>
-          </div>
-          <Select value={String(selectedSetIndex)} onValueChange={(v) => setSelectedSetIndex(Number(v))}>
-            <SelectTrigger className="w-60">
-              <SelectValue placeholder="세트를 선택하세요" />
-            </SelectTrigger>
-            <SelectContent>
-              {sets.map((s, idx) => (
-                <SelectItem key={idx} value={String(idx)}>
-                  {`${idx + 1}세트: ${s.teamA.name} vs ${s.teamB.name}`}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
+    <div style={{ 
+      padding: '20px', 
+      maxWidth: '900px', 
+      margin: '0 auto',
+      backgroundColor: '#f9fafb',
+      minHeight: '100vh'
+    }}>
+      <h1 style={{ 
+        fontSize: '28px', 
+        fontWeight: 'bold', 
+        marginBottom: '30px',
+        textAlign: 'center',
+        color: '#111827'
+      }}>
+        ⚽ 풋살 경기 타임라인
+      </h1>
 
-      <Card>
-        <CardContent className="p-4 space-y-4">
-          <h2 className="text-xl font-bold">경기 이벤트 기록</h2>
-          <div className="flex gap-2 items-center flex-wrap">
-            <Select value={eventType} onValueChange={(v) => setEventType(v as EventType)}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="이벤트 종류" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="goal">골</SelectItem>
-                <SelectItem value="assist">어시스트</SelectItem>
-                <SelectItem value="ownGoal">자책골</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={selectedScorer} onValueChange={setSelectedScorer}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="득점자" />
-              </SelectTrigger>
-              <SelectContent>
-                {allPlayers.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {`${p.number} ${p.name}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {eventType === "goal" && (
-              <Select value={selectedAssist} onValueChange={setSelectedAssist}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="어시스트 (선택)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">없음</SelectItem>
-                  {allPlayers.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {`${p.number} ${p.name}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-
-            {eventType === "assist" && (
-              <Select value={selectedAssist} onValueChange={setSelectedAssist}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="어시스트 선수" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allPlayers.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {`${p.number} ${p.name}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-
-            <Button onClick={handleRecord} disabled={!selectedScorer}>
-              기록
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-4">
-          <h2 className="text-lg font-semibold mb-2">
-            타임라인 - {selectedSet?.name || ""}
+      {/* 세트 선택 */}
+      <div style={cardStyle}>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          marginBottom: '16px'
+        }}>
+          <h2 style={{ fontSize: '20px', fontWeight: '600', margin: 0, color: '#374151' }}>
+            세트 선택
           </h2>
-          <div className="space-y-1 max-h-64 overflow-y-auto">
-            {timeline[selectedSetIndex]?.length ? (
-              timeline[selectedSetIndex].map((line, idx) => (
-                <div key={idx} className="text-sm border-b py-1">
-                  {line}
-                </div>
-              ))
-            ) : (
-              <div className="text-sm text-gray-500 py-2">
-                아직 기록된 이벤트가 없습니다.
-              </div>
-            )}
+          <button 
+            onClick={handleAddSet}
+            style={buttonStyle}
+          >
+            + 세트 추가
+          </button>
+        </div>
+        <select 
+          value={selectedSetIndex} 
+          onChange={(e) => setSelectedSetIndex(Number(e.target.value))}
+          style={{ ...selectStyle, width: '300px' }}
+        >
+          {sets.map((s, idx) => (
+            <option key={idx} value={idx}>
+              {`${idx + 1}세트: ${s.teamA.name} vs ${s.teamB.name}`}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* 이벤트 기록 */}
+      <div style={cardStyle}>
+        <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '20px', color: '#374151' }}>
+          경기 이벤트 기록
+        </h2>
+        <div style={{ 
+          display: 'flex', 
+          gap: '12px', 
+          alignItems: 'center',
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '12px', fontWeight: '500', color: '#6b7280' }}>
+              이벤트 종류
+            </label>
+            <select 
+              value={eventType} 
+              onChange={(e) => setEventType(e.target.value as EventType)}
+              style={{ ...selectStyle, width: '120px' }}
+            >
+              <option value="goal">골</option>
+              <option value="assist">어시스트</option>
+              <option value="ownGoal">자책골</option>
+            </select>
           </div>
-        </CardContent>
-      </Card>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '12px', fontWeight: '500', color: '#6b7280' }}>
+              득점자
+            </label>
+            <select 
+              value={selectedScorer} 
+              onChange={(e) => setSelectedScorer(e.target.value)}
+              style={selectStyle}
+            >
+              <option value="">선택하세요</option>
+              {allPlayers.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {`${p.number}번 ${p.name}`}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {(eventType === "goal" || eventType === "assist") && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label style={{ fontSize: '12px', fontWeight: '500', color: '#6b7280' }}>
+                {eventType === "goal" ? "어시스트 (선택)" : "어시스트 선수"}
+              </label>
+              <select 
+                value={selectedAssist} 
+                onChange={(e) => setSelectedAssist(e.target.value)}
+                style={selectStyle}
+              >
+                <option value="">
+                  {eventType === "goal" ? "없음" : "선택하세요"}
+                </option>
+                {allPlayers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {`${p.number}번 ${p.name}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'end', height: '100%' }}>
+            <button 
+              onClick={handleRecord} 
+              disabled={!selectedScorer}
+              style={{
+                ...buttonStyle,
+                backgroundColor: selectedScorer ? '#3b82f6' : '#9ca3af',
+                cursor: selectedScorer ? 'pointer' : 'not-allowed',
+                marginTop: '20px'
+              }}
+            >
+              📝 기록
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 타임라인 */}
+      <div style={cardStyle}>
+        <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px', color: '#374151' }}>
+          📋 타임라인 - {selectedSet?.name || ""}
+        </h2>
+        <div style={{ 
+          maxHeight: '400px', 
+          overflowY: 'auto',
+          border: '1px solid #e5e7eb',
+          borderRadius: '6px',
+          backgroundColor: '#f9fafb'
+        }}>
+          {timeline[selectedSetIndex]?.length ? (
+            timeline[selectedSetIndex].map((line, idx) => (
+              <div 
+                key={idx} 
+                style={{ 
+                  padding: '12px 16px',
+                  borderBottom: idx < timeline[selectedSetIndex].length - 1 ? '1px solid #e5e7eb' : 'none',
+                  fontSize: '14px',
+                  backgroundColor: idx % 2 === 0 ? 'white' : '#f9fafb'
+                }}
+              >
+                {line}
+              </div>
+            ))
+          ) : (
+            <div style={{ 
+              padding: '40px 20px',
+              textAlign: 'center',
+              color: '#6b7280',
+              fontSize: '14px'
+            }}>
+              아직 기록된 이벤트가 없습니다.
+              <br />
+              위에서 득점자를 선택하고 기록 버튼을 눌러보세요!
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
