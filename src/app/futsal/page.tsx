@@ -289,24 +289,6 @@ export default function FutsalManager() {
     setAppPhase('gameReady');
   };
 
-  // 게임 관리
-  const startGame = () => {
-    if (!currentSet || !currentMatch) return;
-    
-    const updatedSets = currentMatch.sets.map((set, idx) => 
-      idx === currentSetIndex 
-        ? { ...set, isActive: true, startTime: Date.now() }
-        : set
-    );
-
-    const updatedMatch = { ...currentMatch, sets: updatedSets };
-    setCurrentMatch(updatedMatch);
-    setMatches(prev => prev.map(m => m.id === currentMatch.id ? updatedMatch : m));
-    
-    setGameTime(0);
-    setAppPhase('playing');
-  };
-
   const togglePause = () => {
     setAppPhase(prev => prev === 'playing' ? 'paused' : 'playing');
   };
