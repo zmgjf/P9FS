@@ -1,141 +1,113 @@
-'use client';
-
-import { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Select, SelectTrigger, SelectItem, SelectContent, SelectValue } from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface Member {
+  id: string;
   name: string;
-}
-
-interface TimelineEntry {
-  type: 'score';
-  scorer: string;
-  assist?: string;
-  time: string;
+  number: number;
 }
 
 interface Team {
+  id: string;
   name: string;
-  score: number;
   members: Member[];
-  timeline: TimelineEntry[];
 }
 
-export default function FutsalDashboard() {
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [newTeamName, setNewTeamName] = useState('');
-  const [newMemberNames, setNewMemberNames] = useState<{ [key: number]: string }>({});
-  const [selectedScorers, setSelectedScorers] = useState<{ [key: number]: string }>({});
-  const [selectedAssists, setSelectedAssists] = useState<{ [key: number]: string }>({});
+interface SetInfo {
+  name: string;
+  teamA: Team;
+  teamB: Team;
+}
 
-  const addTeam = () => {
-    if (!newTeamName.trim()) return;
-    const newTeam: Team = {
-      name: newTeamName,
-      score: 0,
-      members: [],
-      timeline: [],
-    };
-    setTeams([...teams, newTeam]);
-    setNewTeamName('');
-  };
+const MatchTimeline: React.FC<{ setInfo: SetInfo }> = ({ setInfo }) => {
+  const [timeline, setTimeline] = useState<string[]>([]);
+  const [selectedScorer, setSelectedScorer] = useState<string>("");
+  const [selectedAssist, setSelectedAssist] = useState<string>("");
+  const [eventType, setEventType] = useState<"goal" | "assist" | "ownGoal">("goal");
 
-  const addMember = (teamIdx: number) => {
-    const name = newMemberNames[teamIdx];
-    if (!name?.trim()) return;
-    const newTeams = [...teams];
-    newTeams[teamIdx].members.push({ name });
-    setTeams(newTeams);
-    setNewMemberNames({ ...newMemberNames, [teamIdx]: '' });
-  };
+  const allPlayers = [...setInfo.teamA.members, ...setInfo.teamB.members];
 
-  const addScore = (teamIdx: number) => {
-    const scorer = selectedScorers[teamIdx];
-    if (!scorer) return;
-    const assist = selectedAssists[teamIdx];
-    const newTeams = [...teams];
-    newTeams[teamIdx].score += 1;
-    newTeams[teamIdx].timeline.push({
-      type: 'score',
-      scorer,
-      assist,
-      time: new Date().toLocaleTimeString(),
-    });
-    setTeams(newTeams);
+  const handleRecord = () => {
+    const scorer = allPlayers.find((p) => p.id === selectedScorer);
+    const assist = allPlayers.find((p) => p.id === selectedAssist);
+    const time = new Date().toLocaleTimeString();
+
+    let text = "";
+    if (eventType === "goal") {
+      text = `${scorer?.name} (${scorer?.number}) 골! ${assist ? `도움: ${assist.name}` : ""}`;
+    } else if (eventType === "assist") {
+      text = `${assist?.name} (${assist?.number}) 어시스트 기록`;
+    } else {
+      text = `${scorer?.name} (${scorer?.number}) 자책골`;
+    }
+
+    setTimeline((prev) => [...prev, `${time} - ${text}`]);
+    setSelectedScorer("");
+    setSelectedAssist("");
   };
 
   return (
     <div className="p-4 space-y-4">
-      {/* 팀 추가 UI */}
-      <div className="flex space-x-2">
-        <Input
-          placeholder="팀 이름 입력"
-          value={newTeamName}
-          onChange={(e) => setNewTeamName(e.target.value)}
-        />
-        <Button onClick={addTeam}>팀 추가</Button>
-      </div>
+      <Card>
+        <CardContent className="p-4 space-y-4">
+          <h2 className="text-xl font-bold">경기 이벤트 기록</h2>
+          <div className="flex gap-2 items-center">
+            <Select value={eventType} onValueChange={(v) => setEventType(v as any)}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="이벤트 종류" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="goal">골</SelectItem>
+                <SelectItem value="assist">어시스트</SelectItem>
+                <SelectItem value="ownGoal">자책골</SelectItem>
+              </SelectContent>
+            </Select>
 
-      {/* 팀 목록 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {teams.map((team, idx) => (
-          <Card key={idx} className="rounded-2xl shadow-xl">
-            <CardContent className="space-y-4 p-4">
-              <h2 className="text-xl font-bold text-center">{team.name}</h2>
-              <div className="text-6xl text-center font-semibold">{team.score}</div>
-
-              {/* 득점자/어시스트자 선택 */}
-              <div className="space-y-2">
-                <Select onValueChange={(value) => setSelectedScorers({ ...selectedScorers, [idx]: value })}>
-                  <SelectTrigger><SelectValue placeholder="득점자 선택" /></SelectTrigger>
-                  <SelectContent>
-                    {team.members.map((m, i) => (
-                      <SelectItem key={i} value={m.name}>{m.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select onValueChange={(value) => setSelectedAssists({ ...selectedAssists, [idx]: value })}>
-                  <SelectTrigger><SelectValue placeholder="어시스트자 선택 (선택)" /></SelectTrigger>
-                  <SelectContent>
-                    {team.members.map((m, i) => (
-                      <SelectItem key={i} value={m.name}>{m.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button className="w-full" onClick={() => addScore(idx)}>
-                  득점 기록
-                </Button>
-              </div>
-
-              {/* 멤버 추가 */}
-              <div className="space-y-2">
-                <Input
-                  placeholder="멤버 이름 입력"
-                  value={newMemberNames[idx] || ''}
-                  onChange={(e) => setNewMemberNames({ ...newMemberNames, [idx]: e.target.value })}
-                />
-                <Button className="w-full" variant="secondary" onClick={() => addMember(idx)}>
-                  멤버 추가
-                </Button>
-              </div>
-
-              {/* 타임라인 */}
-              <div className="h-40 overflow-y-auto border-t pt-2 text-sm">
-                <h3 className="font-semibold mb-1">타임라인</h3>
-                {team.timeline.map((entry, i) => (
-                  <div key={i} className="border-b py-1">
-                    {entry.scorer} 득점
-                    {entry.assist ? ` (어시스트: ${entry.assist})` : ''} - {entry.time}
-                  </div>
+            <Select value={selectedScorer} onValueChange={setSelectedScorer}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="득점자" />
+              </SelectTrigger>
+              <SelectContent>
+                {allPlayers.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{`${p.number} ${p.name}`}</SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+
+            {eventType === "goal" && (
+              <Select value={selectedAssist} onValueChange={setSelectedAssist}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="어시스트" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allPlayers.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{`${p.number} ${p.name}`}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            <Button onClick={handleRecord}>기록</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-4">
+          <h2 className="text-lg font-semibold mb-2">타임라인</h2>
+          <div className="space-y-1 max-h-64 overflow-y-auto">
+            {timeline.map((line, idx) => (
+              <div key={idx} className="text-sm border-b py-1">
+                {line}
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
-}
+};
+
+export default MatchTimeline;
