@@ -81,6 +81,44 @@ export default function FutsalManager() {
 
   const currentSet = currentMatch?.sets[currentSetIndex];
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getScore = (team: 'A' | 'B') => {
+    if (!currentSet) return 0;
+    return currentSet.events.filter(event => 
+      event.type === 'goal' && event.team === team
+    ).length;
+  };
+
+  // 게임 관리 함수들
+  const finishSet = () => {
+    if (!currentSet || !currentMatch) return;
+
+    const scoreA = getScore('A');
+    const scoreB = getScore('B');
+
+    const updatedSets = currentMatch.sets.map((set, idx) => 
+      idx === currentSetIndex 
+        ? { 
+            ...set, 
+            isActive: false, 
+            finalScore: { teamA: scoreA, teamB: scoreB },
+            completedAt: new Date().toISOString()
+          }
+        : set
+    );
+
+    const updatedMatch = { ...currentMatch, sets: updatedSets };
+    setCurrentMatch(updatedMatch);
+    setMatches(prev => prev.map(m => m.id === currentMatch.id ? updatedMatch : m));
+    
+    setAppPhase('finished');
+  };
+
   // 로컬 스토리지 저장/로드
   useEffect(() => {
     // 데이터 로드
@@ -273,20 +311,12 @@ export default function FutsalManager() {
     setAppPhase(prev => prev === 'playing' ? 'paused' : 'playing');
   };
 
-  const finishSet = () => {
+  const startGame = () => {
     if (!currentSet || !currentMatch) return;
-
-    const scoreA = getScore('A');
-    const scoreB = getScore('B');
-
+    
     const updatedSets = currentMatch.sets.map((set, idx) => 
       idx === currentSetIndex 
-        ? { 
-            ...set, 
-            isActive: false, 
-            finalScore: { teamA: scoreA, teamB: scoreB },
-            completedAt: new Date().toISOString()
-          }
+        ? { ...set, isActive: true, startTime: Date.now() }
         : set
     );
 
@@ -294,36 +324,8 @@ export default function FutsalManager() {
     setCurrentMatch(updatedMatch);
     setMatches(prev => prev.map(m => m.id === currentMatch.id ? updatedMatch : m));
     
-    setAppPhase('finished');
-  };
-
-  // 이벤트 처리
-  const handlePlayerClick = (player: Player, team: 'A' | 'B') => {
-    if (appPhase !== 'playing') return;
-
-    if (actionMode === 'goal') {
-      setSelectedPlayer(player);
-    } else if (actionMode === 'ownGoal') {
-      recordEvent('ownGoal', player, team);
-    }
-  };
-
-  const recordGoalOnly = () => {
-    if (!selectedPlayer || !currentSet) return;
-    
-    const isTeamA = currentSet.teamA.players.some(p => p.id === selectedPlayer.id);
-    const team = isTeamA ? 'A' : 'B';
-    
-    recordEvent('goal', selectedPlayer, team);
-  };
-
-  const recordGoalWithAssist = (assistPlayer: Player) => {
-    if (!selectedPlayer || !currentSet) return;
-    
-    const isTeamA = currentSet.teamA.players.some(p => p.id === selectedPlayer.id);
-    const team = isTeamA ? 'A' : 'B';
-    
-    recordEvent('goal', selectedPlayer, team, assistPlayer);
+    setGameTime(0);
+    setAppPhase('playing');
   };
 
   const recordEvent = (type: 'goal' | 'ownGoal', scorer: Player, team: 'A' | 'B', assist?: Player) => {
@@ -357,17 +359,33 @@ export default function FutsalManager() {
     setSelectedPlayer(null);
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  // 이벤트 처리
+  const handlePlayerClick = (player: Player, team: 'A' | 'B') => {
+    if (appPhase !== 'playing') return;
+
+    if (actionMode === 'goal') {
+      setSelectedPlayer(player);
+    } else if (actionMode === 'ownGoal') {
+      recordEvent('ownGoal', player, team);
+    }
   };
 
-  const getScore = (team: 'A' | 'B') => {
-    if (!currentSet) return 0;
-    return currentSet.events.filter(event => 
-      event.type === 'goal' && event.team === team
-    ).length;
+  const recordGoalOnly = () => {
+    if (!selectedPlayer || !currentSet) return;
+    
+    const isTeamA = currentSet.teamA.players.some(p => p.id === selectedPlayer.id);
+    const team = isTeamA ? 'A' : 'B';
+    
+    recordEvent('goal', selectedPlayer, team);
+  };
+
+  const recordGoalWithAssist = (assistPlayer: Player) => {
+    if (!selectedPlayer || !currentSet) return;
+    
+    const isTeamA = currentSet.teamA.players.some(p => p.id === selectedPlayer.id);
+    const team = isTeamA ? 'A' : 'B';
+    
+    recordEvent('goal', selectedPlayer, team, assistPlayer);
   };
 
   const exportData = () => {
