@@ -21,7 +21,7 @@ export default function Page() {
   const currentSet = sets[currentSetIndex];
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f8f9fa', fontFamily: 'Arial, sans-serif' }}>
+    <div className="min-h-screen">
       {appPhase === "matchManagement" && (
         <MatchManagement
           matches={matches}
