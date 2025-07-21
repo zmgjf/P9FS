@@ -21,7 +21,7 @@ export default function Page() {
   const currentSet = sets[currentSetIndex];
 
   return (
-    <>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f8f9fa', fontFamily: 'Arial, sans-serif' }}>
       {appPhase === "matchManagement" && (
         <MatchManagement
           matches={matches}
@@ -46,7 +46,7 @@ export default function Page() {
           setCurrentSetIndex={setCurrentSetIndex}
         />
       )}
-      {appPhase === "playing" && currentSet && (
+      {(appPhase === "playing" || appPhase === "gameReady") && currentSet && (
         <GameScreen
           currentSet={currentSet}
           setCurrentSet={(newSet) => {
@@ -57,6 +57,6 @@ export default function Page() {
           setAppPhase={setAppPhase}
         />
       )}
-    </>
+    </div>
   );
 }
