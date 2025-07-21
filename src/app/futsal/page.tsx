@@ -49,11 +49,11 @@ export default function Page() {
       {appPhase === "playing" && currentSet && (
         <GameScreen
           currentSet={currentSet}
-          setCurrentSet={(newSet) =>
-            setSets((prev) =>
+          setCurrentSet={(newSet) => {
+            setSets((prev: GameSet[]): GameSet[] =>
               prev.map((s, idx) => (idx === currentSetIndex ? newSet : s))
-            )
-          }
+            );
+          }}
           setAppPhase={setAppPhase}
         />
       )}

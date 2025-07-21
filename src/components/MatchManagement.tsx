@@ -4,12 +4,13 @@
 
 import React, { useState } from "react";
 import type { Match } from "@/lib/types";
+import type { AppPhase } from "@/lib/types";
 
 interface Props {
   matches: Match[];
   setMatches: React.Dispatch<React.SetStateAction<Match[]>>;
   setCurrentMatch: (match: Match) => void;
-  setAppPhase: (phase: string) => void;
+  setAppPhase: React.Dispatch<React.SetStateAction<AppPhase>>;
 }
 
 export default function MatchManagement({ matches, setMatches, setCurrentMatch, setAppPhase }: Props) {

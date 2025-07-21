@@ -1,4 +1,4 @@
-// src/lib/types.ts
+// lib/types.ts
 
 export interface Player {
   id: string;
@@ -44,13 +44,11 @@ export interface Match {
   createdAt: string;
 }
 
-export type AppPhase = 
-  | 'matchManagement' 
-  | 'teamManagement' 
-  | 'setSetup' 
-  | 'gameReady' 
-  | 'playing' 
-  | 'paused' 
+export type AppPhase =
+  | 'matchManagement'
+  | 'teamManagement'
+  | 'setSetup'
+  | 'gameReady'
+  | 'playing'
+  | 'paused'
   | 'finished';
-
-export type ActionMode = 'none' | 'goal' | 'ownGoal';

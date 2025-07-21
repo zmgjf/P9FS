@@ -4,11 +4,12 @@
 
 import React, { useState } from "react";
 import type { Team, Player } from "@/lib/types";
+import type { AppPhase } from "@/lib/types";
 
 interface Props {
   teams: Team[];
   setTeams: React.Dispatch<React.SetStateAction<Team[]>>;
-  setAppPhase: (phase: string) => void;
+  setAppPhase: React.Dispatch<React.SetStateAction<AppPhase>>;
 }
 
 export default function TeamManagement({ teams, setTeams, setAppPhase }: Props) {

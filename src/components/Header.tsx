@@ -4,10 +4,11 @@
 
 import React from "react";
 import type { Match } from "@/lib/types";
+import type { AppPhase } from "@/lib/types";
 
 interface Props {
   match: Match;
-  setAppPhase: (phase: string) => void;
+  setAppPhase: React.Dispatch<React.SetStateAction<AppPhase>>;
 }
 
 export default function Header({ match, setAppPhase }: Props) {

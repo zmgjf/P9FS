@@ -8,7 +8,7 @@ import EventTimeline from "@/components/EventTimeline";
 
 interface Props {
   currentSet: GameSet;
-  setCurrentSet: React.Dispatch<React.SetStateAction<GameSet>>;
+  setCurrentSet: (newSet: GameSet) => void;
   setAppPhase: React.Dispatch<React.SetStateAction<AppPhase>>;
 }
 
@@ -28,31 +28,31 @@ export default function GameScreen({ currentSet, setCurrentSet, setAppPhase }: P
       team: "A",
     };
 
-    setCurrentSet(prev => ({
-      ...prev,
-      events: [...prev.events, newEvent]
-    }));
+    setCurrentSet({
+      ...currentSet,
+      events: [...currentSet.events, newEvent]
+    });
 
     setTime("");
     setSelectedPlayer("");
   };
 
   const handleDeleteEvent = (eventId: string) => {
-    setCurrentSet(prev => ({
-      ...prev,
-      events: prev.events.filter(event => event.id !== eventId)
-    }));
+    setCurrentSet({
+      ...currentSet,
+      events: currentSet.events.filter(event => event.id !== eventId)
+    });
   };
 
   const handleEditEvent = (eventId: string, newPlayerName: string) => {
-    setCurrentSet(prev => ({
-      ...prev,
-      events: prev.events.map(event =>
+    setCurrentSet({
+      ...currentSet,
+      events: currentSet.events.map(event =>
         event.id === eventId
           ? { ...event, player: { ...event.player, name: newPlayerName } }
           : event
       )
-    }));
+    });
   };
 
   return (
@@ -79,12 +79,8 @@ export default function GameScreen({ currentSet, setCurrentSet, setAppPhase }: P
         onEditEvent={handleEditEvent}
       />
 
-      <button onClick={() => setAppPhase("paused")}>
-        ⏸ 일시정지
-      </button>
-      <button onClick={() => setAppPhase("finished")}>
-        🏁 종료
-      </button>
+      <button onClick={() => setAppPhase("paused")}>⏸ 일시정지</button>
+      <button onClick={() => setAppPhase("finished")}>🏁 종료</button>
     </div>
   );
 }
