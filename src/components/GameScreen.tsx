@@ -2,47 +2,39 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
-import type { GameSet, GameEvent, Player } from "@/lib/types";
-import EventTimeline from "./EventTimeline";
+import React, { useState } from "react";
+import type { GameSet, Team, GameEvent, AppPhase } from "@/lib/types";
+import EventTimeline from "@/components/EventTimeline";
 
 interface Props {
   currentSet: GameSet;
   setCurrentSet: React.Dispatch<React.SetStateAction<GameSet>>;
-  onCompleteSet: (updatedSet: GameSet) => void;
+  setAppPhase: React.Dispatch<React.SetStateAction<AppPhase>>;
 }
 
-export default function GameScreen({ currentSet, setCurrentSet, onCompleteSet }: Props) {
-  const [timeLeft, setTimeLeft] = useState(currentSet.duration * 60);
-  const [timerRunning, setTimerRunning] = useState(false);
+export default function GameScreen({ currentSet, setCurrentSet, setAppPhase }: Props) {
+  const [time, setTime] = useState("");
+  const [selectedPlayer, setSelectedPlayer] = useState("");
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    if (timerRunning && timeLeft > 0) {
-      interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
-    } else if (timeLeft === 0 && timerRunning) {
-      setTimerRunning(false);
-      handleComplete();
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [timerRunning, timeLeft]);
+  const handleAddEvent = () => {
+    if (!time.trim() || !selectedPlayer.trim()) return;
 
-  const handleScore = (team: "A" | "B", player: Player, assistPlayer?: Player, ownGoal = false) => {
     const newEvent: GameEvent = {
-      id: Date.now().toString(),
-      time: `${Math.floor((currentSet.duration * 60 - timeLeft) / 60)}:${(currentSet.duration * 60 - timeLeft) % 60}`,
-      realTime: currentSet.duration * 60 - timeLeft,
-      type: ownGoal ? 'ownGoal' : 'goal',
-      player,
-      assistPlayer,
-      team,
+      id: Date.now().toString(36),
+      time,
+      realTime: Date.now(),
+      type: "goal",
+      player: { id: selectedPlayer, name: selectedPlayer },
+      team: "A",
     };
+
     setCurrentSet(prev => ({
       ...prev,
-      events: [...prev.events, newEvent],
+      events: [...prev.events, newEvent]
     }));
+
+    setTime("");
+    setSelectedPlayer("");
   };
 
   const handleDeleteEvent = (eventId: string) => {
@@ -56,39 +48,29 @@ export default function GameScreen({ currentSet, setCurrentSet, onCompleteSet }:
     setCurrentSet(prev => ({
       ...prev,
       events: prev.events.map(event =>
-        event.id === eventId ? {
-          ...event,
-          player: { ...event.player, name: newPlayerName }
-        } : event
+        event.id === eventId
+          ? { ...event, player: { ...event.player, name: newPlayerName } }
+          : event
       )
     }));
   };
 
-  const handleComplete = () => {
-    const finalScore = currentSet.events.reduce((acc, ev) => {
-      if (ev.type === "goal") {
-        acc[ev.team === "A" ? "teamA" : "teamB"]++;
-      } else if (ev.type === "ownGoal") {
-        acc[ev.team === "A" ? "teamB" : "teamA"]++;
-      }
-      return acc;
-    }, { teamA: 0, teamB: 0 });
-
-    onCompleteSet({
-      ...currentSet,
-      isActive: false,
-      finalScore,
-      completedAt: new Date().toISOString(),
-    });
-  };
-
   return (
     <div style={{ padding: 20 }}>
-      <h2>⚽ 경기 중: {currentSet.name}</h2>
+      <h2>⚽ 경기 진행 중</h2>
+
       <div>
-        ⏱ 시간: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
-        <button onClick={() => setTimerRunning(prev => !prev)}>{timerRunning ? "일시정지" : "시작"}</button>
-        <button onClick={handleComplete}>경기 종료</button>
+        <input
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+          placeholder="시간"
+        />
+        <input
+          value={selectedPlayer}
+          onChange={(e) => setSelectedPlayer(e.target.value)}
+          placeholder="선수 이름"
+        />
+        <button onClick={handleAddEvent}>기록 추가</button>
       </div>
 
       <EventTimeline
@@ -97,7 +79,12 @@ export default function GameScreen({ currentSet, setCurrentSet, onCompleteSet }:
         onEditEvent={handleEditEvent}
       />
 
-      {/* 득점 처리 등은 별도 UI에서 호출 필요 */}
+      <button onClick={() => setAppPhase("paused")}>
+        ⏸ 일시정지
+      </button>
+      <button onClick={() => setAppPhase("finished")}>
+        🏁 종료
+      </button>
     </div>
   );
 }

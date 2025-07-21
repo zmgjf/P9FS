@@ -3,13 +3,13 @@
 "use client";
 
 import React, { useState } from "react";
-import type { GameSet, Team } from "@/lib/types";
+import type { GameSet, Team, AppPhase } from "@/lib/types";
 
 interface Props {
   sets: GameSet[];
   setSets: React.Dispatch<React.SetStateAction<GameSet[]>>;
   teams: Team[];
-  setAppPhase: (phase: string) => void;
+  setAppPhase: React.Dispatch<React.SetStateAction<AppPhase>>;
   setCurrentSetIndex: (index: number) => void;
 }
 
