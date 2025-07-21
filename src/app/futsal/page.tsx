@@ -88,11 +88,38 @@ export default function FutsalManager() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // const getScore = (team: 'A' | 'B') => {
+  //   if (!currentSet) return 0;
+  //   return currentSet.events.filter(event => 
+  //     event.type === 'goal' && event.team === team
+  //   ).length;
+  // };
   const getScore = (team: 'A' | 'B') => {
     if (!currentSet) return 0;
-    return currentSet.events.filter(event => 
-      event.type === 'goal' && event.team === team
-    ).length;
+    return currentSet.events.filter(event => {
+      if (event.type === 'goal') {
+        return event.team === team;
+      } else if (event.type === 'ownGoal') {
+        return event.team !== team; // 자책골은 상대 팀 점수에 반영
+      }
+      return false;
+    }).length;
+  };
+
+  const updateSet = (index: number, updatedSet: GameSet) => {
+    if (!currentMatch) return;
+    const updatedSets = [...currentMatch.sets];
+    updatedSets[index] = updatedSet;
+    const updatedMatch = { ...currentMatch, sets: updatedSets };
+    setCurrentMatch(updatedMatch);
+    setMatches(prev => prev.map(m => m.id === updatedMatch.id ? updatedMatch : m));
+  };
+
+  const editSet = (index: number, name: string, duration: number) => {
+    if (!currentMatch) return;
+    const original = currentMatch.sets[index];
+    const updatedSet = { ...original, name, duration };
+    updateSet(index, updatedSet);
   };
 
   // 게임 관리 함수들
@@ -916,23 +943,14 @@ export default function FutsalManager() {
           
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>경기 시간:</label>
-            <select 
+            <input
+              type="number"
+              min="1"
               value={newSetDuration}
               onChange={(e) => setNewSetDuration(parseInt(e.target.value))}
-              style={{ 
-                width: '100%', 
-                padding: '10px', 
-                border: '1px solid #ddd', 
-                borderRadius: '4px' 
-              }}
-            >
-              <option value={5}>5분</option>
-              <option value={10}>10분</option>
-              <option value={15}>15분</option>
-              <option value={20}>20분</option>
-              <option value={25}>25분</option>
-              <option value={30}>30분</option>
-            </select>
+              placeholder="경기 시간 (분 단위)"
+              style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+            />
           </div>
           
           <div style={{ marginBottom: '20px' }}>
