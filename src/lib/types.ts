@@ -16,13 +16,10 @@ export interface GameEvent {
   id: string;
   time: string;
   realTime: number;
-  type: 'goal' | 'ownGoal' | 'substitution';
+  type: 'goal' | 'ownGoal';
   player: Player;
   assistPlayer?: Player;
   team: 'A' | 'B';
-  // 교체 관련 필드
-  playerOut?: Player;
-  playerIn?: Player;
 }
 
 export interface PlayerPosition {

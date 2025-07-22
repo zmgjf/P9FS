@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import type { GameSet, Team, GameEvent, AppPhase, Player } from "@/lib/types";
+import type { GameSet, GameEvent, AppPhase } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -194,17 +194,7 @@ export default function GameScreen({
       return;
     }
 
-    // 교체 이벤트 기록
-    const substitutionEvent: GameEvent = {
-      id: Date.now().toString(36),
-      time: formatTime(gameTime),
-      realTime: Date.now(),
-      type: 'goal', // 교체는 별도 타입이 없으므로 임시로 goal 사용
-      player: { id: playerIn, name: `${inPlayerData.name} ↔ ${outPlayer.name}` },
-      team: substitutionTeam,
-    };
-
-    // 포지션 업데이트
+    // 포지션 업데이트 (선수 교체)
     setPlayerPositions(prev => 
       prev.map(player => 
         player.id === playerOut 
@@ -213,8 +203,6 @@ export default function GameScreen({
       )
     );
 
-    // 이벤트 기록 (별도 교체 기록으로 처리하려면 types.ts에 substitution 타입 추가 필요)
-    
     setShowSubstitution(false);
     setPlayerOut("");
     setPlayerIn("");
