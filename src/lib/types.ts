@@ -16,10 +16,22 @@ export interface GameEvent {
   id: string;
   time: string;
   realTime: number;
-  type: 'goal' | 'ownGoal';
+  type: 'goal' | 'ownGoal' | 'substitution';
   player: Player;
   assistPlayer?: Player;
   team: 'A' | 'B';
+  // 교체 관련 필드
+  playerOut?: Player;
+  playerIn?: Player;
+}
+
+export interface PlayerPosition {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  team: 'A' | 'B';
+  isActive: boolean;
 }
 
 export interface GameSet {
@@ -33,6 +45,11 @@ export interface GameSet {
   events: GameEvent[];
   finalScore?: { teamA: number; teamB: number };
   completedAt?: string;
+  // 포메이션 정보
+  formation?: string;
+  playerPositions?: PlayerPosition[];
+  teamACount?: number;
+  teamBCount?: number;
 }
 
 export interface Match {
@@ -48,6 +65,7 @@ export type AppPhase =
   | 'matchManagement'
   | 'teamManagement'
   | 'setSetup'
+  | 'formationSetup'
   | 'gameReady'
   | 'playing'
   | 'paused'

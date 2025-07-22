@@ -3,9 +3,10 @@
 "use client";
 
 import React, { useState } from "react";
-import type { Match, GameSet, Team, AppPhase } from "@/lib/types";
+import type { Match, GameSet, Team, AppPhase, PlayerPosition } from "@/lib/types";
 import TeamManagement from "@/components/TeamManagement";
 import SetSetup from "@/components/SetSetup";
+import FormationSetup from "@/components/FormationSetup";
 import GameScreen from "@/components/GameScreen";
 import MatchManagement from "@/components/MatchManagement";
 
@@ -18,7 +19,33 @@ export default function Page() {
   const [sets, setSets] = useState<GameSet[]>([]);
   const [currentSetIndex, setCurrentSetIndex] = useState(0);
 
+  // 포메이션 관련 상태
+  const [currentFormation, setCurrentFormation] = useState<PlayerPosition[]>([]);
+  const [teamACount, setTeamACount] = useState(3);
+  const [teamBCount, setTeamBCount] = useState(3);
+
   const currentSet = sets[currentSetIndex];
+
+  // 포메이션 설정 완료 핸들러
+  const handleFormationReady = (positions: PlayerPosition[], teamACountValue: number, teamBCountValue: number) => {
+    setCurrentFormation(positions);
+    setTeamACount(teamACountValue);
+    setTeamBCount(teamBCountValue);
+    
+    // 현재 세트에 포메이션 정보 저장
+    if (currentSet) {
+      const updatedSet = {
+        ...currentSet,
+        playerPositions: positions,
+        teamACount: teamACountValue,
+        teamBCount: teamBCountValue
+      };
+      
+      setSets(prev => prev.map((set, index) => 
+        index === currentSetIndex ? updatedSet : set
+      ));
+    }
+  };
 
   return (
     <div className="min-h-screen">
@@ -30,6 +57,7 @@ export default function Page() {
           setAppPhase={setAppPhase}
         />
       )}
+      
       {appPhase === "teamManagement" && (
         <TeamManagement
           teams={teams}
@@ -37,6 +65,7 @@ export default function Page() {
           setAppPhase={setAppPhase}
         />
       )}
+      
       {appPhase === "setSetup" && (
         <SetSetup
           sets={sets}
@@ -46,6 +75,20 @@ export default function Page() {
           setCurrentSetIndex={setCurrentSetIndex}
         />
       )}
+      
+      {appPhase === "formationSetup" && currentSet && (
+        <FormationSetup
+          currentSet={currentSet}
+          setCurrentSet={(newSet) => {
+            setSets(prev => prev.map((set, index) => 
+              index === currentSetIndex ? newSet : set
+            ));
+          }}
+          setAppPhase={setAppPhase}
+          onFormationReady={handleFormationReady}
+        />
+      )}
+      
       {(appPhase === "playing" || appPhase === "gameReady") && currentSet && (
         <GameScreen
           currentSet={currentSet}
@@ -55,6 +98,9 @@ export default function Page() {
             );
           }}
           setAppPhase={setAppPhase}
+          initialPositions={currentFormation}
+          teamACount={teamACount}
+          teamBCount={teamBCount}
         />
       )}
     </div>

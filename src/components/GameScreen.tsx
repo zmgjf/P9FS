@@ -9,21 +9,32 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-interface Props {
-  currentSet: GameSet;
-  setCurrentSet: (newSet: GameSet) => void;
-  setAppPhase: React.Dispatch<React.SetStateAction<AppPhase>>;
-}
-
 interface PlayerPosition {
   id: string;
   name: string;
   x: number;
   y: number;
   team: 'A' | 'B';
+  isActive: boolean;
 }
 
-export default function GameScreen({ currentSet, setCurrentSet, setAppPhase }: Props) {
+interface Props {
+  currentSet: GameSet;
+  setCurrentSet: (newSet: GameSet) => void;
+  setAppPhase: React.Dispatch<React.SetStateAction<AppPhase>>;
+  initialPositions?: PlayerPosition[];
+  teamACount?: number;
+  teamBCount?: number;
+}
+
+export default function GameScreen({ 
+  currentSet, 
+  setCurrentSet, 
+  setAppPhase, 
+  initialPositions, 
+  teamACount = 3, 
+  teamBCount = 3 
+}: Props) {
   const [gameTime, setGameTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState("");
@@ -31,6 +42,12 @@ export default function GameScreen({ currentSet, setCurrentSet, setAppPhase }: P
   const [eventType, setEventType] = useState<'goal' | 'ownGoal'>('goal');
   const [assistPlayer, setAssistPlayer] = useState("");
   const [customTime, setCustomTime] = useState("");
+  
+  // 교체 관련 상태
+  const [showSubstitution, setShowSubstitution] = useState(false);
+  const [substitutionTeam, setSubstitutionTeam] = useState<'A' | 'B'>('A');
+  const [playerOut, setPlayerOut] = useState("");
+  const [playerIn, setPlayerIn] = useState("");
   
   // 편집 상태
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -41,25 +58,30 @@ export default function GameScreen({ currentSet, setCurrentSet, setAppPhase }: P
 
   // 선수 포지션 상태
   const [playerPositions, setPlayerPositions] = useState<PlayerPosition[]>(() => {
+    if (initialPositions) {
+      return initialPositions;
+    }
+    
+    // 기본 포지션 (3v3)
     const teamAPlayers = currentSet.teamA?.players || [];
     const teamBPlayers = currentSet.teamB?.players || [];
     
     return [
-      // 팀A 선수들 (빨간색)
-      ...teamAPlayers.slice(0, 5).map((player, index) => ({
+      ...teamAPlayers.slice(0, teamACount).map((player, index) => ({
         id: player.id,
         name: player.name,
         x: 15 + (index * 5),
         y: 30 + (index % 3) * 20,
-        team: 'A' as const
+        team: 'A' as const,
+        isActive: true
       })),
-      // 팀B 선수들 (파란색)  
-      ...teamBPlayers.slice(0, 5).map((player, index) => ({
+      ...teamBPlayers.slice(0, teamBCount).map((player, index) => ({
         id: player.id,
         name: player.name,
         x: 75 - (index * 5),
         y: 30 + (index % 3) * 20,
-        team: 'B' as const
+        team: 'B' as const,
+        isActive: true
       }))
     ];
   });
@@ -98,6 +120,18 @@ export default function GameScreen({ currentSet, setCurrentSet, setAppPhase }: P
   const scoreB = currentSet.events.filter(e => 
     (e.team === 'B' && e.type === 'goal') || (e.team === 'A' && e.type === 'ownGoal')
   ).length;
+
+  // 현재 필드에 있는 선수들
+  const activePlayersA = playerPositions.filter(p => p.team === 'A' && p.isActive);
+  const activePlayersB = playerPositions.filter(p => p.team === 'B' && p.isActive);
+
+  // 벤치에 있는 선수들
+  const benchPlayersA = (currentSet.teamA?.players || []).filter(p => 
+    !activePlayersA.some(ap => ap.id === p.id)
+  );
+  const benchPlayersB = (currentSet.teamB?.players || []).filter(p => 
+    !activePlayersB.some(ap => ap.id === p.id)
+  );
 
   const handleAddEvent = () => {
     if (!selectedPlayer.trim()) {
@@ -143,7 +177,52 @@ export default function GameScreen({ currentSet, setCurrentSet, setAppPhase }: P
     }
   };
 
-  // 이벤트 편집 시작
+  // 선수 교체 처리
+  const handleSubstitution = () => {
+    if (!playerOut || !playerIn) {
+      alert("교체할 선수와 투입할 선수를 모두 선택해주세요.");
+      return;
+    }
+
+    const outPlayer = playerPositions.find(p => p.id === playerOut);
+    const inPlayerData = substitutionTeam === 'A' 
+      ? benchPlayersA.find(p => p.id === playerIn)
+      : benchPlayersB.find(p => p.id === playerIn);
+
+    if (!outPlayer || !inPlayerData) {
+      alert("선수 정보를 찾을 수 없습니다.");
+      return;
+    }
+
+    // 교체 이벤트 기록
+    const substitutionEvent: GameEvent = {
+      id: Date.now().toString(36),
+      time: formatTime(gameTime),
+      realTime: Date.now(),
+      type: 'goal', // 교체는 별도 타입이 없으므로 임시로 goal 사용
+      player: { id: playerIn, name: `${inPlayerData.name} ↔ ${outPlayer.name}` },
+      team: substitutionTeam,
+    };
+
+    // 포지션 업데이트
+    setPlayerPositions(prev => 
+      prev.map(player => 
+        player.id === playerOut 
+          ? { ...player, id: inPlayerData.id, name: inPlayerData.name }
+          : player
+      )
+    );
+
+    // 이벤트 기록 (별도 교체 기록으로 처리하려면 types.ts에 substitution 타입 추가 필요)
+    
+    setShowSubstitution(false);
+    setPlayerOut("");
+    setPlayerIn("");
+    
+    alert(`${outPlayer.name} → ${inPlayerData.name} 교체 완료!`);
+  };
+
+  // 이벤트 편집 함수들
   const startEditingEvent = (event: GameEvent) => {
     setEditingEventId(event.id);
     setEditedEventTime(event.time);
@@ -152,7 +231,6 @@ export default function GameScreen({ currentSet, setCurrentSet, setAppPhase }: P
     setEditedEventType(event.type);
   };
 
-  // 이벤트 편집 저장
   const saveEditedEvent = () => {
     if (!editedEventPlayer.trim()) {
       alert("선수 이름을 입력하세요.");
@@ -177,7 +255,6 @@ export default function GameScreen({ currentSet, setCurrentSet, setAppPhase }: P
     setEditingEventId(null);
   };
 
-  // 이벤트 편집 취소
   const cancelEditingEvent = () => {
     setEditingEventId(null);
     setEditedEventTime("");
@@ -193,17 +270,16 @@ export default function GameScreen({ currentSet, setCurrentSet, setAppPhase }: P
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div>
             <h1 className="text-xl font-bold">{currentSet.name}</h1>
-            <p className="text-sm text-slate-300">{currentSet.teamA?.name || '팀A'} vs {currentSet.teamB?.name || '팀B'}</p>
+            <p className="text-sm text-slate-300">
+              {currentSet.teamA?.name || '팀A'} ({activePlayersA.length}) vs ({activePlayersB.length}) {currentSet.teamB?.name || '팀B'}
+            </p>
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => setAppPhase('matchManagement')} variant="secondary" size="sm">
-              경기 목록
-            </Button>
-            <Button onClick={() => setAppPhase('teamManagement')} variant="secondary" size="sm">
-              팀 관리
-            </Button>
             <Button onClick={() => setAppPhase('setSetup')} variant="secondary" size="sm">
-              세트 관리
+              포메이션 설정
+            </Button>
+            <Button onClick={() => setShowSubstitution(true)} variant="secondary" size="sm">
+              🔄 선수 교체
             </Button>
           </div>
         </div>
@@ -229,11 +305,11 @@ export default function GameScreen({ currentSet, setCurrentSet, setAppPhase }: P
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center text-2xl font-bold">
-                  A
+                  {activePlayersA.length}
                 </div>
                 <div>
                   <div className="text-2xl font-bold">{currentSet.teamA?.name || '팀A'}</div>
-                  <div className="text-sm text-slate-300">{currentSet.teamA?.players?.length || 0}명</div>
+                  <div className="text-sm text-slate-300">{activePlayersA.length}명 경기 중</div>
                 </div>
               </div>
 
@@ -244,10 +320,10 @@ export default function GameScreen({ currentSet, setCurrentSet, setAppPhase }: P
               <div className="flex items-center gap-4">
                 <div className="text-right">
                   <div className="text-2xl font-bold">{currentSet.teamB?.name || '팀B'}</div>
-                  <div className="text-sm text-slate-300">{currentSet.teamB?.players?.length || 0}명</div>
+                  <div className="text-sm text-slate-300">{activePlayersB.length}명 경기 중</div>
                 </div>
                 <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center text-2xl font-bold">
-                  B
+                  {activePlayersB.length}
                 </div>
               </div>
             </div>
@@ -256,23 +332,148 @@ export default function GameScreen({ currentSet, setCurrentSet, setAppPhase }: P
 
         {/* 게임 컨트롤 */}
         <Card className="mb-6">
-          <CardContent className="p-6 text-center">
-            <Button
-              onClick={() => setIsPlaying(!isPlaying)}
-              size="lg"
-              className={`text-lg px-8 py-4 ${
-                isPlaying 
-                  ? 'bg-red-600 hover:bg-red-700' 
-                  : 'bg-green-600 hover:bg-green-700'
-              }`}
-            >
-              {isPlaying ? '⏸️ 일시정지' : '▶️ 게임 시작'}
-            </Button>
-            <p className="text-sm text-gray-600 mt-2">
+          <CardContent className="p-6">
+            <div className="flex justify-center items-center gap-4">
+              <Button
+                onClick={() => setIsPlaying(!isPlaying)}
+                size="lg"
+                className={`text-lg px-8 py-4 ${
+                  isPlaying 
+                    ? 'bg-red-600 hover:bg-red-700' 
+                    : 'bg-green-600 hover:bg-green-700'
+                }`}
+              >
+                {isPlaying ? '⏸️ 일시정지' : '▶️ 게임 시작'}
+              </Button>
+              
+              <Button
+                onClick={() => setShowSubstitution(true)}
+                variant="outline"
+                size="lg"
+                className="border-blue-500 text-blue-600 hover:bg-blue-50"
+              >
+                🔄 선수 교체
+              </Button>
+            </div>
+            <p className="text-sm text-gray-600 mt-3 text-center">
               경기 시간: {formatTime(gameTime)} / {currentSet.duration}분
             </p>
           </CardContent>
         </Card>
+
+        {/* 선수 교체 모달 */}
+        {showSubstitution && (
+          <Card className="mb-6 border-blue-200 bg-blue-50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                🔄 선수 교체
+                <Button 
+                  onClick={() => setShowSubstitution(false)}
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto"
+                >
+                  ✕
+                </Button>
+              </CardTitle>
+              <CardDescription>
+                교체할 선수와 투입할 선수를 선택하세요
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">팀 선택</label>
+                  <Select value={substitutionTeam} onValueChange={(value: 'A' | 'B') => setSubstitutionTeam(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="A">{currentSet.teamA?.name || '팀A'}</SelectItem>
+                      <SelectItem value="B">{currentSet.teamB?.name || '팀B'}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">교체될 선수 (OUT)</label>
+                  <Select value={playerOut} onValueChange={setPlayerOut}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="교체될 선수 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(substitutionTeam === 'A' ? activePlayersA : activePlayersB).map(player => (
+                        <SelectItem key={player.id} value={player.id}>
+                          {player.name} (필드)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">투입될 선수 (IN)</label>
+                  <Select value={playerIn} onValueChange={setPlayerIn}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="투입될 선수 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(substitutionTeam === 'A' ? benchPlayersA : benchPlayersB).map(player => (
+                        <SelectItem key={player.id} value={player.id}>
+                          {player.name} (벤치)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-4">
+                <Button onClick={handleSubstitution} className="flex-1">
+                  교체 확정
+                </Button>
+                <Button onClick={() => setShowSubstitution(false)} variant="outline" className="flex-1">
+                  취소
+                </Button>
+              </div>
+
+              {/* 벤치 선수 목록 표시 */}
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-medium text-red-600 mb-2">
+                    {currentSet.teamA?.name || '팀A'} 벤치 ({benchPlayersA.length}명)
+                  </h4>
+                  <div className="space-y-1">
+                    {benchPlayersA.map(player => (
+                      <div key={player.id} className="text-sm bg-red-50 p-2 rounded">
+                        {player.name}
+                      </div>
+                    ))}
+                    {benchPlayersA.length === 0 && (
+                      <div className="text-sm text-gray-500">벤치에 선수가 없습니다</div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-blue-600 mb-2">
+                    {currentSet.teamB?.name || '팀B'} 벤치 ({benchPlayersB.length}명)
+                  </h4>
+                  <div className="space-y-1">
+                    {benchPlayersB.map(player => (
+                      <div key={player.id} className="text-sm bg-blue-50 p-2 rounded">
+                        {player.name}
+                      </div>
+                    ))}
+                    {benchPlayersB.length === 0 && (
+                      <div className="text-sm text-gray-500">벤치에 선수가 없습니다</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* 풋살 필드 */}
         <Card className="mb-6 overflow-hidden">
@@ -289,7 +490,7 @@ export default function GameScreen({ currentSet, setCurrentSet, setAppPhase }: P
             <div className="absolute right-0 top-2/5 bottom-2/5 w-6 border-l-2 border-white"></div>
 
             {/* 선수들 */}
-            {playerPositions.map((player) => (
+            {playerPositions.filter(p => p.isActive).map((player) => (
               <div
                 key={player.id}
                 onClick={() => handlePlayerClick(player)}
@@ -311,6 +512,11 @@ export default function GameScreen({ currentSet, setCurrentSet, setAppPhase }: P
 
             <div className="absolute bottom-4 left-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded text-sm">
               💡 선수를 클릭하여 선택하세요
+            </div>
+
+            {/* 현재 인원 표시 */}
+            <div className="absolute top-4 left-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded text-sm">
+              {activePlayersA.length} vs {activePlayersB.length}
             </div>
           </div>
         </Card>
@@ -512,7 +718,7 @@ export default function GameScreen({ currentSet, setCurrentSet, setAppPhase }: P
             <div className="flex justify-between items-center">
               <Button onClick={() => setAppPhase("setSetup")} variant="outline" size="lg">
                 <span className="mr-2">←</span>
-                세트 관리로
+                포메이션 설정으로
               </Button>
               
               <div className="text-center">
@@ -520,7 +726,7 @@ export default function GameScreen({ currentSet, setCurrentSet, setAppPhase }: P
                   {currentSet.teamA?.name || '팀A'} {scoreA} : {scoreB} {currentSet.teamB?.name || '팀B'}
                 </p>
                 <p className="text-sm text-gray-600">
-                  경기 시간: {formatTime(gameTime)} / {currentSet.duration}분
+                  경기 시간: {formatTime(gameTime)} / {currentSet.duration}분 | {activePlayersA.length} vs {activePlayersB.length}
                 </p>
               </div>
 

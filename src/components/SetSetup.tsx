@@ -278,12 +278,12 @@ export default function SetSetup({ sets, setSets, teams, setAppPhase, setCurrent
                         <Button 
                           onClick={() => {
                             setCurrentSetIndex(index);
-                            setAppPhase("playing");
+                            setAppPhase("formationSetup");
                           }}
                           size="sm"
                           className="bg-green-600 hover:bg-green-700"
                         >
-                          ▶️ 경기 시작
+                          ⚙️ 포메이션 설정
                         </Button>
                       </div>
                     </div>
