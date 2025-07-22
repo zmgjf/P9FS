@@ -66,4 +66,5 @@ export type AppPhase =
   | 'gameReady'
   | 'playing'
   | 'paused'
-  | 'finished';
+  | 'finished'
+  | 'matchHistory';

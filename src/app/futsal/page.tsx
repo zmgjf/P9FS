@@ -9,6 +9,7 @@ import SetSetup from "@/components/SetSetup";
 import FormationSetup from "@/components/FormationSetup";
 import GameScreen from "@/components/GameScreen";
 import MatchManagement from "@/components/MatchManagement";
+import MatchHistory from "@/components/MatchHistory";
 
 export default function Page() {
   const [appPhase, setAppPhase] = useState<AppPhase>("matchManagement");
@@ -101,6 +102,13 @@ export default function Page() {
           initialPositions={currentFormation}
           teamACount={teamACount}
           teamBCount={teamBCount}
+        />
+      )}
+
+      {appPhase === "matchHistory" && (
+        <MatchHistory
+          sets={sets}
+          setAppPhase={setAppPhase}
         />
       )}
     </div>

@@ -722,13 +722,13 @@ export default function GameScreen({
                 onClick={() => {
                   if (confirm('경기를 종료하시겠습니까?')) {
                     setIsPlaying(false);
-                    setAppPhase("setSetup");
+                    setAppPhase("matchHistory");
                   }
                 }}
                 variant="destructive"
                 size="lg"
               >
-                🏁 경기 종료
+                🏁 경기 종료 (기록 보기)
               </Button>
             </div>
           </CardContent>
