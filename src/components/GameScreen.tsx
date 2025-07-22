@@ -25,6 +25,7 @@ interface Props {
   initialPositions?: PlayerPosition[];
   teamACount?: number;
   teamBCount?: number;
+  onMatchComplete?: () => void;
 }
 
 export default function GameScreen({ 
@@ -33,7 +34,8 @@ export default function GameScreen({
   setAppPhase, 
   initialPositions, 
   teamACount = 3, 
-  teamBCount = 3 
+  teamBCount = 3,
+  onMatchComplete
 }: Props) {
   const [gameTime, setGameTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -216,7 +218,7 @@ export default function GameScreen({
     setEditedEventTime(event.time);
     setEditedEventPlayer(event.player.name);
     setEditedEventAssist(event.assistPlayer?.name || "");
-    setEditedEventType(event.type);
+    setEditedEventType(event.type as 'goal' | 'ownGoal');
   };
 
   const saveEditedEvent = () => {
@@ -722,6 +724,9 @@ export default function GameScreen({
                 onClick={() => {
                   if (confirm('경기를 종료하시겠습니까?')) {
                     setIsPlaying(false);
+                    if (onMatchComplete) {
+                      onMatchComplete();
+                    }
                     setAppPhase("matchHistory");
                   }
                 }}
