@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState } from "react";
-import type { GameEvent, GameSet } from "@/lib/types";
+import type { GameSet } from "@/lib/types";
 
 interface Props {
   currentSet: GameSet;

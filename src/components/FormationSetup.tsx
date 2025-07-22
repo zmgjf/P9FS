@@ -111,8 +111,6 @@ export default function FormationSetup({ currentSet, setCurrentSet, setAppPhase,
   // 포메이션 적용
   const applyFormation = () => {
     const formation = formations[selectedFormation];
-    const teamACount = formation.teamA.length;
-    const teamBCount = formation.teamB.length;
 
     // 선택된 선수들로 포지션 생성
     const positions: PlayerPosition[] = [];
@@ -337,7 +335,7 @@ export default function FormationSetup({ currentSet, setCurrentSet, setAppPhase,
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-white text-center bg-black bg-opacity-50 p-4 rounded-lg">
                       <p className="text-lg font-bold mb-2">포메이션을 선택하고 적용해주세요</p>
-                      <p className="text-sm">← 왼쪽에서 선수를 선택한 후 "포메이션 적용" 버튼을 클릭하세요</p>
+                      <p className="text-sm">← 왼쪽에서 선수를 선택한 후 &ldquo;포메이션 적용&rdquo; 버튼을 클릭하세요</p>
                     </div>
                   </div>
                 )}

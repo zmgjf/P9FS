@@ -14,7 +14,7 @@ export default function Page() {
   const [appPhase, setAppPhase] = useState<AppPhase>("matchManagement");
 
   const [matches, setMatches] = useState<Match[]>([]);
-  const [currentMatch, setCurrentMatch] = useState<Match | null>(null);
+  const [, setCurrentMatch] = useState<Match | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [sets, setSets] = useState<GameSet[]>([]);
   const [currentSetIndex, setCurrentSetIndex] = useState(0);
