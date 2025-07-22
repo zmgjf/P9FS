@@ -124,6 +124,36 @@ export default function MatchManagement({ matches, setMatches, setCurrentMatch, 
     return 'text-gray-600 bg-gray-50';
   };
 
+  // 안전한 경기 진행 핸들러
+  const handleMatchProgress = (match: Match) => {
+    try {
+      console.log('Processing match:', match);
+      setCurrentMatch(match);
+      
+      // 경기에 세트가 있으면 바로 세트 설정으로, 없으면 팀 관리로
+      if (match.sets && match.sets.length > 0) {
+        setAppPhase("setSetup");
+      } else {
+        setAppPhase("teamManagement");
+      }
+    } catch (error) {
+      console.error('Error in handleMatchProgress:', error);
+      alert("경기 진행 중 오류가 발생했습니다. 다시 시도해주세요.");
+    }
+  };
+
+  // 안전한 팀 관리 핸들러
+  const handleTeamManagement = (match: Match) => {
+    try {
+      console.log('Managing teams for match:', match);
+      setCurrentMatch(match);
+      setAppPhase("teamManagement");
+    } catch (error) {
+      console.error('Error in handleTeamManagement:', error);
+      alert("팀 관리 진입 중 오류가 발생했습니다. 다시 시도해주세요.");
+    }
+  };
+
   // 필터링된 경기 목록
   const filteredMatches = matches.filter(match => {
     const matchesStatus = filterStatus === 'all' || match.status === filterStatus;
@@ -422,10 +452,7 @@ export default function MatchManagement({ matches, setMatches, setCurrentMatch, 
 
                           <div className="flex gap-2 mb-2">
                             <Button 
-                              onClick={() => {
-                                setCurrentMatch(match);
-                                setAppPhase("teamManagement");
-                              }}
+                              onClick={() => handleTeamManagement(match)}
                               variant="outline"
                               size="sm"
                               className="flex-1"
@@ -434,10 +461,7 @@ export default function MatchManagement({ matches, setMatches, setCurrentMatch, 
                               팀 관리
                             </Button>
                             <Button 
-                              onClick={() => {
-                                setCurrentMatch(match);
-                                setAppPhase("setSetup");
-                              }}
+                              onClick={() => handleMatchProgress(match)}
                               size="sm"
                               className="flex-1"
                             >

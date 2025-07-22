@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { Team, Player } from "@/lib/types";
 import type { AppPhase } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,11 @@ export default function TeamManagement({ teams, setTeams, setAppPhase }: Props) 
   const [editedPlayerName, setEditedPlayerName] = useState("");
   const [addingPlayerToTeam, setAddingPlayerToTeam] = useState<string | null>(null);
 
+  // 컴포넌트 마운트 시 전역 팀 데이터 확인
+  useEffect(() => {
+    console.log('TeamManagement mounted with teams:', teams);
+  }, [teams]);
+
   const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
 
   const createTeam = () => {
@@ -31,13 +36,20 @@ export default function TeamManagement({ teams, setTeams, setAppPhase }: Props) 
       alert("팀 이름을 입력하세요.");
       return;
     }
+    
     const newTeam: Team = {
       id: generateId(),
       name: newTeamName,
       players: [],
       createdAt: new Date().toISOString(),
     };
-    setTeams(prev => [...prev, newTeam]);
+    
+    console.log('Creating new team:', newTeam);
+    setTeams(prev => {
+      const updated = [...prev, newTeam];
+      console.log('Updated teams after creation:', updated);
+      return updated;
+    });
     setNewTeamName("");
   };
 
@@ -46,6 +58,7 @@ export default function TeamManagement({ teams, setTeams, setAppPhase }: Props) 
       alert("팀 이름을 입력하세요.");
       return;
     }
+    
     setTeams(prev => prev.map(team => team.id === teamId ? { ...team, name: editedTeamName } : team));
     setEditingTeamId(null);
     setEditedTeamName("");
@@ -56,10 +69,13 @@ export default function TeamManagement({ teams, setTeams, setAppPhase }: Props) 
       alert("선수 이름을 입력하세요.");
       return;
     }
+    
     const newPlayer: Player = {
       id: generateId(),
       name: newPlayerName,
     };
+    
+    console.log('Adding player to team:', teamId, newPlayer);
     setTeams(prev =>
       prev.map(t =>
         t.id === teamId ? { ...t, players: [...t.players, newPlayer] } : t
@@ -74,6 +90,7 @@ export default function TeamManagement({ teams, setTeams, setAppPhase }: Props) 
       alert("선수 이름을 입력하세요.");
       return;
     }
+    
     setTeams(prev =>
       prev.map(team =>
         team.id === teamId
@@ -126,6 +143,51 @@ export default function TeamManagement({ teams, setTeams, setAppPhase }: Props) 
     setEditedPlayerName("");
   };
 
+  // 전체 저장 함수
+  const saveToGlobalTeams = () => {
+    const shouldSave = confirm(
+      '현재 팀 설정을 전체 팀 목록에 저장하시겠습니까?\n' +
+      '저장하면 다른 경기에서도 이 팀들을 사용할 수 있습니다.'
+    );
+    
+    if (shouldSave) {
+      // 전역 팀 데이터에 저장
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('futsal-global-teams', JSON.stringify(teams));
+      }
+      alert('팀 데이터가 전체 목록에 저장되었습니다!');
+    }
+  };
+
+  // 전역 팀 불러오기
+  const loadFromGlobalTeams = () => {
+    if (typeof window !== 'undefined') {
+      const savedGlobalTeams = localStorage.getItem('futsal-global-teams');
+      if (savedGlobalTeams) {
+        try {
+          const globalTeams = JSON.parse(savedGlobalTeams);
+          if (globalTeams.length > 0) {
+            const shouldLoad = confirm(
+              '저장된 ' + globalTeams.length + '개의 팀을 불러오시겠습니까?\n' +
+              '현재 작업 중인 팀 데이터는 대체됩니다.'
+            );
+            
+            if (shouldLoad) {
+              setTeams(globalTeams);
+              alert('전체 팀 목록을 불러왔습니다!');
+            }
+          } else {
+            alert('저장된 전체 팀 목록이 없습니다.');
+          }
+        } catch {
+          alert('팀 데이터를 불러오는 중 오류가 발생했습니다.');
+        }
+      } else {
+        alert('저장된 전체 팀 목록이 없습니다.');
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-6">
       <div className="max-w-6xl mx-auto">
@@ -134,6 +196,39 @@ export default function TeamManagement({ teams, setTeams, setAppPhase }: Props) 
           <h1 className="text-4xl font-bold text-gray-800 mb-2">👥 팀 관리</h1>
           <p className="text-gray-600">팀과 선수를 추가하고 관리하세요</p>
         </div>
+
+        {/* 전역 팀 관리 버튼들 */}
+        <Card className="mb-6 border-purple-200 bg-purple-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <span className="text-2xl">💾</span>
+              팀 데이터 관리
+            </CardTitle>
+            <CardDescription>
+              팀 데이터를 저장하고 불러와서 다른 경기에서도 사용하세요
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4">
+              <Button onClick={saveToGlobalTeams} variant="outline" className="flex-1">
+                <span className="mr-2">💾</span>
+                전체 목록에 저장
+              </Button>
+              <Button onClick={loadFromGlobalTeams} variant="outline" className="flex-1">
+                <span className="mr-2">📂</span>
+                전체 목록에서 불러오기
+              </Button>
+            </div>
+            <div className="mt-3 text-sm text-purple-700 bg-purple-100 p-3 rounded-lg">
+              <p className="font-medium mb-1">💡 팁:</p>
+              <ul className="space-y-1">
+                <li>• 전체 목록에 저장: 현재 팀들을 모든 경기에서 사용할 수 있도록 저장</li>
+                <li>• 전체 목록에서 불러오기: 이전에 저장한 팀들을 현재 경기로 가져오기</li>
+                <li>• 경기가 끝나도 저장된 팀 데이터는 사라지지 않습니다</li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* 새 팀 추가 카드 */}
         <Card className="mb-8">
@@ -169,7 +264,11 @@ export default function TeamManagement({ teams, setTeams, setAppPhase }: Props) 
             <CardContent className="text-center py-12">
               <div className="text-6xl mb-4">👥</div>
               <p className="text-gray-500 text-lg mb-2">아직 팀이 없습니다</p>
-              <p className="text-gray-400">위에서 새 팀을 만들어보세요!</p>
+                              <p className="text-gray-400 mb-4">위에서 새 팀을 만들거나 저장된 팀을 불러와보세요!</p>
+              <Button onClick={loadFromGlobalTeams} variant="outline">
+                <span className="mr-2">📂</span>
+                저장된 팀 불러오기
+              </Button>
             </CardContent>
           </Card>
         ) : (
@@ -334,7 +433,7 @@ export default function TeamManagement({ teams, setTeams, setAppPhase }: Props) 
                 <p className="text-sm text-gray-600 mb-2">
                   {teams.length >= 2 
                     ? "✅ 팀이 준비되었습니다!" 
-                    : `⚠️ 최소 2개 팀이 필요합니다 (현재: ${teams.length}개)`
+                    : "⚠️ 최소 2개 팀이 필요합니다 (현재: " + teams.length + "개)"
                   }
                 </p>
                 <p className="text-xs text-gray-500">
@@ -345,15 +444,25 @@ export default function TeamManagement({ teams, setTeams, setAppPhase }: Props) 
                 </p>
               </div>
 
-              <Button 
-                onClick={() => setAppPhase("setSetup")} 
-                disabled={teams.length < 2}
-                size="lg"
-              >
-                <span className="mr-2">⚽</span>
-                세트 설정으로
-                <span className="ml-2">→</span>
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={saveToGlobalTeams}
+                  variant="outline"
+                  size="lg"
+                >
+                  <span className="mr-2">💾</span>
+                  저장
+                </Button>
+                <Button 
+                  onClick={() => setAppPhase("setSetup")} 
+                  disabled={teams.length < 2}
+                  size="lg"
+                >
+                  <span className="mr-2">⚽</span>
+                  세트 설정으로
+                  <span className="ml-2">→</span>
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

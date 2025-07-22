@@ -13,12 +13,6 @@ interface Props {
 }
 
 export default function MatchHistory({ sets, setAppPhase }: Props) {
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
   const getScore = (set: GameSet) => {
     const scoreA = set.events.filter(e => 
       (e.team === 'A' && e.type === 'goal') || (e.team === 'B' && e.type === 'ownGoal')
@@ -107,7 +101,7 @@ export default function MatchHistory({ sets, setAppPhase }: Props) {
 
         {/* 세트별 기록 */}
         <div className="space-y-6">
-          {sets.map((set, index) => {
+          {sets.map((set) => {
             const { scoreA, scoreB } = getScore(set);
             const winner = getWinner(scoreA, scoreB);
             
