@@ -1,9 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useState, useMemo } from "react";
 import type { GameSet, AppPhase } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Props {
   sets: GameSet[];
@@ -17,11 +18,37 @@ interface PlayerStats {
   ownGoals: number;
   teamName: string;
   gamesPlayed: number;
+  goalsPerGame: number;
+  totalContribution: number; // 골 + 어시스트
 }
 
+interface TeamStats {
+  name: string;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  gamesPlayed: number;
+  points: number;
+  goalDifference: number;
+  winPercentage: number;
+  averageGoalsPerGame: number;
+}
+
+type PlayerSortField = 'name' | 'goals' | 'assists' | 'gamesPlayed' | 'goalsPerGame' | 'totalContribution';
+type TeamSortField = 'name' | 'points' | 'wins' | 'goalDifference' | 'goalsFor' | 'winPercentage';
+type SortOrder = 'asc' | 'desc';
+
 export default function Statistics({ sets, setAppPhase }: Props) {
+  const [playerSortField, setPlayerSortField] = useState<PlayerSortField>('goals');
+  const [playerSortOrder, setPlayerSortOrder] = useState<SortOrder>('desc');
+  const [teamSortField, setTeamSortField] = useState<TeamSortField>('points');
+  const [teamSortOrder, setTeamSortOrder] = useState<SortOrder>('desc');
+  const [showTopPlayersOnly, setShowTopPlayersOnly] = useState(false);
+
   // 선수별 통계 계산
-  const calculatePlayerStats = (): PlayerStats[] => {
+  const playerStats = useMemo((): PlayerStats[] => {
     const statsMap = new Map<string, PlayerStats>();
 
     sets.forEach(set => {
@@ -34,7 +61,9 @@ export default function Statistics({ sets, setAppPhase }: Props) {
             assists: 0,
             ownGoals: 0,
             teamName: set.teamA?.name || '팀A',
-            gamesPlayed: 0
+            gamesPlayed: 0,
+            goalsPerGame: 0,
+            totalContribution: 0
           });
         }
         const stats = statsMap.get(player.id)!;
@@ -49,7 +78,9 @@ export default function Statistics({ sets, setAppPhase }: Props) {
             assists: 0,
             ownGoals: 0,
             teamName: set.teamB?.name || '팀B',
-            gamesPlayed: 0
+            gamesPlayed: 0,
+            goalsPerGame: 0,
+            totalContribution: 0
           });
         }
         const stats = statsMap.get(player.id)!;
@@ -79,20 +110,17 @@ export default function Statistics({ sets, setAppPhase }: Props) {
       });
     });
 
-    return Array.from(statsMap.values());
-  };
+    // 계산된 통계 추가
+    return Array.from(statsMap.values()).map(player => ({
+      ...player,
+      goalsPerGame: player.gamesPlayed > 0 ? player.goals / player.gamesPlayed : 0,
+      totalContribution: player.goals + player.assists
+    }));
+  }, [sets]);
 
   // 팀별 통계 계산
-  const calculateTeamStats = () => {
-    const teamStats = new Map<string, {
-      name: string;
-      wins: number;
-      draws: number;
-      losses: number;
-      goalsFor: number;
-      goalsAgainst: number;
-      gamesPlayed: number;
-    }>();
+  const teamStats = useMemo((): TeamStats[] => {
+    const teamStatsMap = new Map<string, TeamStats>();
 
     sets.forEach(set => {
       const scoreA = set.events.filter(e => 
@@ -105,70 +133,155 @@ export default function Statistics({ sets, setAppPhase }: Props) {
 
       // 팀A 통계
       const teamAName = set.teamA?.name || '팀A';
-      if (!teamStats.has(teamAName)) {
-        teamStats.set(teamAName, {
+      if (!teamStatsMap.has(teamAName)) {
+        teamStatsMap.set(teamAName, {
           name: teamAName,
           wins: 0,
           draws: 0,
           losses: 0,
           goalsFor: 0,
           goalsAgainst: 0,
-          gamesPlayed: 0
+          gamesPlayed: 0,
+          points: 0,
+          goalDifference: 0,
+          winPercentage: 0,
+          averageGoalsPerGame: 0
         });
       }
-      const teamAStats = teamStats.get(teamAName)!;
+      const teamAStats = teamStatsMap.get(teamAName)!;
       teamAStats.gamesPlayed++;
       teamAStats.goalsFor += scoreA;
       teamAStats.goalsAgainst += scoreB;
-      if (scoreA > scoreB) teamAStats.wins++;
-      else if (scoreA === scoreB) teamAStats.draws++;
-      else teamAStats.losses++;
+      if (scoreA > scoreB) {
+        teamAStats.wins++;
+        teamAStats.points += 3;
+      } else if (scoreA === scoreB) {
+        teamAStats.draws++;
+        teamAStats.points += 1;
+      } else {
+        teamAStats.losses++;
+      }
 
       // 팀B 통계
       const teamBName = set.teamB?.name || '팀B';
-      if (!teamStats.has(teamBName)) {
-        teamStats.set(teamBName, {
+      if (!teamStatsMap.has(teamBName)) {
+        teamStatsMap.set(teamBName, {
           name: teamBName,
           wins: 0,
           draws: 0,
           losses: 0,
           goalsFor: 0,
           goalsAgainst: 0,
-          gamesPlayed: 0
+          gamesPlayed: 0,
+          points: 0,
+          goalDifference: 0,
+          winPercentage: 0,
+          averageGoalsPerGame: 0
         });
       }
-      const teamBStats = teamStats.get(teamBName)!;
+      const teamBStats = teamStatsMap.get(teamBName)!;
       teamBStats.gamesPlayed++;
       teamBStats.goalsFor += scoreB;
       teamBStats.goalsAgainst += scoreA;
-      if (scoreB > scoreA) teamBStats.wins++;
-      else if (scoreA === scoreB) teamBStats.draws++;
-      else teamBStats.losses++;
+      if (scoreB > scoreA) {
+        teamBStats.wins++;
+        teamBStats.points += 3;
+      } else if (scoreA === scoreB) {
+        teamBStats.draws++;
+        teamBStats.points += 1;
+      } else {
+        teamBStats.losses++;
+      }
     });
 
-    return Array.from(teamStats.values());
-  };
+    // 계산된 통계 추가
+    return Array.from(teamStatsMap.values()).map(team => ({
+      ...team,
+      goalDifference: team.goalsFor - team.goalsAgainst,
+      winPercentage: team.gamesPlayed > 0 ? (team.wins / team.gamesPlayed) * 100 : 0,
+      averageGoalsPerGame: team.gamesPlayed > 0 ? team.goalsFor / team.gamesPlayed : 0
+    }));
+  }, [sets]);
 
-  const playerStats = calculatePlayerStats();
-  const teamStats = calculateTeamStats();
+  // 정렬된 선수 통계
+  const sortedPlayerStats = useMemo(() => {
+    let filtered = showTopPlayersOnly 
+      ? playerStats.filter(p => p.goals > 0 || p.assists > 0)
+      : playerStats;
 
-  // 상위 골잡이들
-  const topScorers = playerStats
-    .filter(player => player.goals > 0)
-    .sort((a, b) => b.goals - a.goals)
-    .slice(0, 5);
+    return [...filtered].sort((a, b) => {
+      const aValue = a[playerSortField];
+      const bValue = b[playerSortField];
+      
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return playerSortOrder === 'asc' 
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+      
+      return playerSortOrder === 'asc' 
+        ? (aValue as number) - (bValue as number)
+        : (bValue as number) - (aValue as number);
+    });
+  }, [playerStats, playerSortField, playerSortOrder, showTopPlayersOnly]);
 
-  // 상위 어시스트들
-  const topAssisters = playerStats
-    .filter(player => player.assists > 0)
-    .sort((a, b) => b.assists - a.assists)
-    .slice(0, 5);
+  // 정렬된 팀 통계
+  const sortedTeamStats = useMemo(() => {
+    return [...teamStats].sort((a, b) => {
+      const aValue = a[teamSortField];
+      const bValue = b[teamSortField];
+      
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return teamSortOrder === 'asc' 
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+      
+      return teamSortOrder === 'asc' 
+        ? (aValue as number) - (bValue as number)
+        : (bValue as number) - (aValue as number);
+    });
+  }, [teamStats, teamSortField, teamSortOrder]);
 
   // 전체 통계
   const totalGames = sets.length;
   const totalGoals = sets.reduce((sum, set) => sum + set.events.filter(e => e.type === 'goal').length, 0);
   const totalPlayers = playerStats.length;
   const avgGoalsPerGame = totalGames > 0 ? (totalGoals / totalGames).toFixed(1) : '0';
+
+  // 상위 선수들
+  const topScorers = playerStats
+    .filter(player => player.goals > 0)
+    .sort((a, b) => b.goals - a.goals)
+    .slice(0, 3);
+
+  const topAssisters = playerStats
+    .filter(player => player.assists > 0)
+    .sort((a, b) => b.assists - a.assists)
+    .slice(0, 3);
+
+  const handlePlayerSort = (field: PlayerSortField) => {
+    if (field === playerSortField) {
+      setPlayerSortOrder(playerSortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setPlayerSortField(field);
+      setPlayerSortOrder('desc');
+    }
+  };
+
+  const handleTeamSort = (field: TeamSortField) => {
+    if (field === teamSortField) {
+      setTeamSortOrder(teamSortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setTeamSortField(field);
+      setTeamSortOrder('desc');
+    }
+  };
+
+  const getSortIcon = (field: string, currentField: string, currentOrder: SortOrder) => {
+    if (field !== currentField) return '↕️';
+    return currentOrder === 'asc' ? '⬆️' : '⬇️';
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6">
@@ -209,45 +322,31 @@ export default function Statistics({ sets, setAppPhase }: Props) {
           </CardContent>
         </Card>
 
+        {/* 상위 선수 요약 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* 상위 득점자 */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <span className="text-2xl">⚽</span>
                 상위 득점자
               </CardTitle>
-              <CardDescription>
-                가장 많은 골을 넣은 선수들
-              </CardDescription>
             </CardHeader>
             <CardContent>
               {topScorers.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <div className="text-3xl mb-2">⚽</div>
-                  <p>아직 득점 기록이 없습니다</p>
-                </div>
+                <div className="text-center py-4 text-gray-500">득점 기록이 없습니다</div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {topScorers.map((player, index) => (
-                    <div key={player.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
-                          index === 0 ? 'bg-yellow-500' : 
-                          index === 1 ? 'bg-gray-400' : 
-                          index === 2 ? 'bg-amber-600' : 'bg-gray-500'
+                    <div key={player.name} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                          index === 0 ? 'bg-yellow-500' : index === 1 ? 'bg-gray-400' : 'bg-amber-600'
                         }`}>
                           {index + 1}
-                        </div>
-                        <div>
-                          <div className="font-medium">{player.name}</div>
-                          <div className="text-sm text-gray-600">{player.teamName}</div>
-                        </div>
+                        </span>
+                        <span className="font-medium">{player.name}</span>
                       </div>
-                      <div className="text-right">
-                        <div className="font-bold text-lg">{player.goals}골</div>
-                        <div className="text-sm text-gray-600">{player.gamesPlayed}경기</div>
-                      </div>
+                      <span className="font-bold">{player.goals}골</span>
                     </div>
                   ))}
                 </div>
@@ -255,44 +354,29 @@ export default function Statistics({ sets, setAppPhase }: Props) {
             </CardContent>
           </Card>
 
-          {/* 상위 도움 제공자 */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <span className="text-2xl">🅰️</span>
                 상위 어시스트
               </CardTitle>
-              <CardDescription>
-                가장 많은 어시스트를 기록한 선수들
-              </CardDescription>
             </CardHeader>
             <CardContent>
               {topAssisters.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <div className="text-3xl mb-2">🅰️</div>
-                  <p>아직 어시스트 기록이 없습니다</p>
-                </div>
+                <div className="text-center py-4 text-gray-500">어시스트 기록이 없습니다</div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {topAssisters.map((player, index) => (
-                    <div key={player.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
-                          index === 0 ? 'bg-yellow-500' : 
-                          index === 1 ? 'bg-gray-400' : 
-                          index === 2 ? 'bg-amber-600' : 'bg-gray-500'
+                    <div key={player.name} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                          index === 0 ? 'bg-yellow-500' : index === 1 ? 'bg-gray-400' : 'bg-amber-600'
                         }`}>
                           {index + 1}
-                        </div>
-                        <div>
-                          <div className="font-medium">{player.name}</div>
-                          <div className="text-sm text-gray-600">{player.teamName}</div>
-                        </div>
+                        </span>
+                        <span className="font-medium">{player.name}</span>
                       </div>
-                      <div className="text-right">
-                        <div className="font-bold text-lg">{player.assists}도움</div>
-                        <div className="text-sm text-gray-600">{player.gamesPlayed}경기</div>
-                      </div>
+                      <span className="font-bold">{player.assists}도움</span>
                     </div>
                   ))}
                 </div>
@@ -301,7 +385,7 @@ export default function Statistics({ sets, setAppPhase }: Props) {
           </Card>
         </div>
 
-        {/* 팀 순위 */}
+        {/* 팀 순위표 */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -309,71 +393,111 @@ export default function Statistics({ sets, setAppPhase }: Props) {
               팀 순위표
             </CardTitle>
             <CardDescription>
-              팀별 승패 기록과 득실 현황
+              팀별 승패 기록 (클릭하여 정렬)
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {teamStats.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <div className="text-3xl mb-2">🏆</div>
-                <p>아직 팀 기록이 없습니다</p>
-              </div>
+            <div className="mb-4 flex gap-4 items-center">
+              <Select value={teamSortField} onValueChange={(value: TeamSortField) => setTeamSortField(value)}>
+                <SelectTrigger className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="points">승점순</SelectItem>
+                  <SelectItem value="wins">승수순</SelectItem>
+                  <SelectItem value="goalDifference">득실차순</SelectItem>
+                  <SelectItem value="goalsFor">득점순</SelectItem>
+                  <SelectItem value="winPercentage">승률순</SelectItem>
+                  <SelectItem value="name">팀명순</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button 
+                variant="outline" 
+                onClick={() => setTeamSortOrder(teamSortOrder === 'asc' ? 'desc' : 'asc')}
+              >
+                {teamSortOrder === 'asc' ? '⬆️ 오름차순' : '⬇️ 내림차순'}
+              </Button>
+            </div>
+
+            {sortedTeamStats.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">팀 기록이 없습니다</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-200">
                       <th className="text-left py-3 px-2">순위</th>
-                      <th className="text-left py-3 px-2">팀명</th>
+                      <th 
+                        className="text-left py-3 px-2 cursor-pointer hover:bg-gray-50"
+                        onClick={() => handleTeamSort('name')}
+                      >
+                        팀명 {getSortIcon('name', teamSortField, teamSortOrder)}
+                      </th>
                       <th className="text-center py-3 px-2">경기</th>
-                      <th className="text-center py-3 px-2">승</th>
+                      <th 
+                        className="text-center py-3 px-2 cursor-pointer hover:bg-gray-50"
+                        onClick={() => handleTeamSort('wins')}
+                      >
+                        승 {getSortIcon('wins', teamSortField, teamSortOrder)}
+                      </th>
                       <th className="text-center py-3 px-2">무</th>
                       <th className="text-center py-3 px-2">패</th>
-                      <th className="text-center py-3 px-2">득점</th>
+                      <th 
+                        className="text-center py-3 px-2 cursor-pointer hover:bg-gray-50"
+                        onClick={() => handleTeamSort('goalsFor')}
+                      >
+                        득점 {getSortIcon('goalsFor', teamSortField, teamSortOrder)}
+                      </th>
                       <th className="text-center py-3 px-2">실점</th>
-                      <th className="text-center py-3 px-2">득실차</th>
-                      <th className="text-center py-3 px-2">승점</th>
+                      <th 
+                        className="text-center py-3 px-2 cursor-pointer hover:bg-gray-50"
+                        onClick={() => handleTeamSort('goalDifference')}
+                      >
+                        득실차 {getSortIcon('goalDifference', teamSortField, teamSortOrder)}
+                      </th>
+                      <th 
+                        className="text-center py-3 px-2 cursor-pointer hover:bg-gray-50"
+                        onClick={() => handleTeamSort('points')}
+                      >
+                        승점 {getSortIcon('points', teamSortField, teamSortOrder)}
+                      </th>
+                      <th 
+                        className="text-center py-3 px-2 cursor-pointer hover:bg-gray-50"
+                        onClick={() => handleTeamSort('winPercentage')}
+                      >
+                        승률 {getSortIcon('winPercentage', teamSortField, teamSortOrder)}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {teamStats
-                      .sort((a, b) => {
-                        const pointsA = a.wins * 3 + a.draws;
-                        const pointsB = b.wins * 3 + b.draws;
-                        if (pointsA !== pointsB) return pointsB - pointsA;
-                        return (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst);
-                      })
-                      .map((team, index) => {
-                        const points = team.wins * 3 + team.draws;
-                        const goalDiff = team.goalsFor - team.goalsAgainst;
-                        return (
-                          <tr key={team.name} className="border-b border-gray-100 hover:bg-gray-50">
-                            <td className="py-3 px-2">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm ${
-                                index === 0 ? 'bg-yellow-500' : 
-                                index === 1 ? 'bg-gray-400' : 
-                                index === 2 ? 'bg-amber-600' : 'bg-gray-500'
-                              }`}>
-                                {index + 1}
-                              </div>
-                            </td>
-                            <td className="py-3 px-2 font-medium">{team.name}</td>
-                            <td className="py-3 px-2 text-center">{team.gamesPlayed}</td>
-                            <td className="py-3 px-2 text-center text-green-600 font-medium">{team.wins}</td>
-                            <td className="py-3 px-2 text-center text-gray-600">{team.draws}</td>
-                            <td className="py-3 px-2 text-center text-red-600 font-medium">{team.losses}</td>
-                            <td className="py-3 px-2 text-center">{team.goalsFor}</td>
-                            <td className="py-3 px-2 text-center">{team.goalsAgainst}</td>
-                            <td className={`py-3 px-2 text-center font-medium ${
-                              goalDiff > 0 ? 'text-green-600' : 
-                              goalDiff < 0 ? 'text-red-600' : 'text-gray-600'
-                            }`}>
-                              {goalDiff > 0 ? '+' : ''}{goalDiff}
-                            </td>
-                            <td className="py-3 px-2 text-center font-bold">{points}</td>
-                          </tr>
-                        );
-                      })}
+                    {sortedTeamStats.map((team, index) => (
+                      <tr key={team.name} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-2">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm ${
+                            index === 0 ? 'bg-yellow-500' : 
+                            index === 1 ? 'bg-gray-400' : 
+                            index === 2 ? 'bg-amber-600' : 'bg-gray-500'
+                          }`}>
+                            {index + 1}
+                          </div>
+                        </td>
+                        <td className="py-3 px-2 font-medium">{team.name}</td>
+                        <td className="py-3 px-2 text-center">{team.gamesPlayed}</td>
+                        <td className="py-3 px-2 text-center text-green-600 font-medium">{team.wins}</td>
+                        <td className="py-3 px-2 text-center text-gray-600">{team.draws}</td>
+                        <td className="py-3 px-2 text-center text-red-600 font-medium">{team.losses}</td>
+                        <td className="py-3 px-2 text-center">{team.goalsFor}</td>
+                        <td className="py-3 px-2 text-center">{team.goalsAgainst}</td>
+                        <td className={`py-3 px-2 text-center font-medium ${
+                          team.goalDifference > 0 ? 'text-green-600' : 
+                          team.goalDifference < 0 ? 'text-red-600' : 'text-gray-600'
+                        }`}>
+                          {team.goalDifference > 0 ? '+' : ''}{team.goalDifference}
+                        </td>
+                        <td className="py-3 px-2 text-center font-bold">{team.points}</td>
+                        <td className="py-3 px-2 text-center">{team.winPercentage.toFixed(1)}%</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -389,49 +513,98 @@ export default function Statistics({ sets, setAppPhase }: Props) {
               선수별 상세 통계
             </CardTitle>
             <CardDescription>
-              모든 선수의 개인 기록
+              모든 선수의 개인 기록 (클릭하여 정렬)
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {playerStats.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <div className="text-3xl mb-2">👥</div>
-                <p>아직 선수 기록이 없습니다</p>
-              </div>
+            <div className="mb-4 flex flex-wrap gap-4 items-center">
+              <Select value={playerSortField} onValueChange={(value: PlayerSortField) => setPlayerSortField(value)}>
+                <SelectTrigger className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="goals">골 수</SelectItem>
+                  <SelectItem value="assists">어시스트</SelectItem>
+                  <SelectItem value="totalContribution">총 공헌도</SelectItem>
+                  <SelectItem value="goalsPerGame">경기당 골</SelectItem>
+                  <SelectItem value="gamesPlayed">출장 횟수</SelectItem>
+                  <SelectItem value="name">이름순</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button 
+                variant="outline" 
+                onClick={() => setPlayerSortOrder(playerSortOrder === 'asc' ? 'desc' : 'asc')}
+              >
+                {playerSortOrder === 'asc' ? '⬆️ 오름차순' : '⬇️ 내림차순'}
+              </Button>
+              <Button 
+                variant={showTopPlayersOnly ? "default" : "outline"}
+                onClick={() => setShowTopPlayersOnly(!showTopPlayersOnly)}
+              >
+                {showTopPlayersOnly ? '전체 선수 보기' : '활약 선수만 보기'}
+              </Button>
+            </div>
+
+            {sortedPlayerStats.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">선수 기록이 없습니다</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-2">선수명</th>
+                      <th 
+                        className="text-left py-3 px-2 cursor-pointer hover:bg-gray-50"
+                        onClick={() => handlePlayerSort('name')}
+                      >
+                        선수명 {getSortIcon('name', playerSortField, playerSortOrder)}
+                      </th>
                       <th className="text-left py-3 px-2">팀</th>
-                      <th className="text-center py-3 px-2">경기</th>
-                      <th className="text-center py-3 px-2">골</th>
-                      <th className="text-center py-3 px-2">어시스트</th>
+                      <th 
+                        className="text-center py-3 px-2 cursor-pointer hover:bg-gray-50"
+                        onClick={() => handlePlayerSort('gamesPlayed')}
+                      >
+                        경기 {getSortIcon('gamesPlayed', playerSortField, playerSortOrder)}
+                      </th>
+                      <th 
+                        className="text-center py-3 px-2 cursor-pointer hover:bg-gray-50"
+                        onClick={() => handlePlayerSort('goals')}
+                      >
+                        골 {getSortIcon('goals', playerSortField, playerSortOrder)}
+                      </th>
+                      <th 
+                        className="text-center py-3 px-2 cursor-pointer hover:bg-gray-50"
+                        onClick={() => handlePlayerSort('assists')}
+                      >
+                        도움 {getSortIcon('assists', playerSortField, playerSortOrder)}
+                      </th>
+                      <th 
+                        className="text-center py-3 px-2 cursor-pointer hover:bg-gray-50"
+                        onClick={() => handlePlayerSort('totalContribution')}
+                      >
+                        총기여 {getSortIcon('totalContribution', playerSortField, playerSortOrder)}
+                      </th>
                       <th className="text-center py-3 px-2">자책골</th>
-                      <th className="text-center py-3 px-2">경기당 평균골</th>
+                      <th 
+                        className="text-center py-3 px-2 cursor-pointer hover:bg-gray-50"
+                        onClick={() => handlePlayerSort('goalsPerGame')}
+                      >
+                        경기당골 {getSortIcon('goalsPerGame', playerSortField, playerSortOrder)}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {playerStats
-                      .sort((a, b) => {
-                        if (b.goals !== a.goals) return b.goals - a.goals;
-                        return b.assists - a.assists;
-                      })
-                      .map(player => {
-                        const avgGoals = player.gamesPlayed > 0 ? (player.goals / player.gamesPlayed).toFixed(2) : '0.00';
-                        return (
-                          <tr key={player.name} className="border-b border-gray-100 hover:bg-gray-50">
-                            <td className="py-3 px-2 font-medium">{player.name}</td>
-                            <td className="py-3 px-2 text-gray-600">{player.teamName}</td>
-                            <td className="py-3 px-2 text-center">{player.gamesPlayed}</td>
-                            <td className="py-3 px-2 text-center font-bold text-green-600">{player.goals}</td>
-                            <td className="py-3 px-2 text-center text-blue-600">{player.assists}</td>
-                            <td className="py-3 px-2 text-center text-red-600">{player.ownGoals}</td>
-                            <td className="py-3 px-2 text-center text-gray-600">{avgGoals}</td>
-                          </tr>
-                        );
-                      })}
+                    {sortedPlayerStats.map(player => (
+                      <tr key={player.name} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-2 font-medium">{player.name}</td>
+                        <td className="py-3 px-2 text-gray-600">{player.teamName}</td>
+                        <td className="py-3 px-2 text-center">{player.gamesPlayed}</td>
+                        <td className="py-3 px-2 text-center font-bold text-green-600">{player.goals}</td>
+                        <td className="py-3 px-2 text-center text-blue-600">{player.assists}</td>
+                        <td className="py-3 px-2 text-center font-bold text-purple-600">{player.totalContribution}</td>
+                        <td className="py-3 px-2 text-center text-red-600">{player.ownGoals}</td>
+                        <td className="py-3 px-2 text-center text-gray-600">{player.goalsPerGame.toFixed(2)}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>

@@ -1,18 +1,26 @@
-// components/TeamManagement.tsx
-
+// src/components/TeamManagement.tsx - 간단한 버전
 "use client";
 
 import React, { useState, useEffect } from "react";
-import type { Team, Player } from "@/lib/types";
-import type { AppPhase } from "@/lib/types";
+import type { Team, Player, AppPhase } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Props {
   teams: Team[];
   setTeams: React.Dispatch<React.SetStateAction<Team[]>>;
   setAppPhase: React.Dispatch<React.SetStateAction<AppPhase>>;
+}
+
+interface SavedTeamSet {
+  id: string;
+  name: string;
+  description: string;
+  teams: Team[];
+  createdAt: string;
+  lastUsed?: string;
 }
 
 export default function TeamManagement({ teams, setTeams, setAppPhase }: Props) {
@@ -23,14 +31,213 @@ export default function TeamManagement({ teams, setTeams, setAppPhase }: Props) 
   const [editedTeamName, setEditedTeamName] = useState("");
   const [editedPlayerName, setEditedPlayerName] = useState("");
   const [addingPlayerToTeam, setAddingPlayerToTeam] = useState<string | null>(null);
+  
+  // 팀 세트 저장/불러오기 관련 상태
+  const [savedTeamSets, setSavedTeamSets] = useState<SavedTeamSet[]>([]);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showLoadDialog, setShowLoadDialog] = useState(false);
+  const [saveSetName, setSaveSetName] = useState("");
+  const [saveSetDescription, setSaveSetDescription] = useState("");
+  const [selectedTeamSetId, setSelectedTeamSetId] = useState("");
 
-  // 컴포넌트 마운트 시 전역 팀 데이터 확인
-  useEffect(() => {
-    console.log('TeamManagement mounted with teams:', teams);
-  }, [teams]);
+  // 파일 공유 관련 상태
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importData, setImportData] = useState("");
 
   const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
 
+  // 저장된 팀 세트들 로드
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('futsal-saved-team-sets');
+      if (saved) {
+        try {
+          setSavedTeamSets(JSON.parse(saved));
+        } catch (error) {
+          console.error('Failed to load saved team sets:', error);
+        }
+      }
+    }
+  }, []);
+
+  // 팀 세트 저장
+  const saveTeamSet = () => {
+    if (!saveSetName.trim()) {
+      alert("팀 세트 이름을 입력해주세요.");
+      return;
+    }
+
+    if (teams.length === 0) {
+      alert("저장할 팀이 없습니다.");
+      return;
+    }
+
+    const newTeamSet: SavedTeamSet = {
+      id: generateId(),
+      name: saveSetName,
+      description: saveSetDescription,
+      teams: [...teams],
+      createdAt: new Date().toISOString(),
+    };
+
+    const updatedSets = [...savedTeamSets, newTeamSet];
+    setSavedTeamSets(updatedSets);
+    
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('futsal-saved-team-sets', JSON.stringify(updatedSets));
+    }
+
+    setSaveSetName("");
+    setSaveSetDescription("");
+    setShowSaveDialog(false);
+    alert(`"${saveSetName}" 팀 세트가 저장되었습니다!`);
+  };
+
+  // 팀 세트 불러오기
+  const loadTeamSet = (teamSetId: string) => {
+    const teamSet = savedTeamSets.find(set => set.id === teamSetId);
+    if (!teamSet) {
+      alert("선택된 팀 세트를 찾을 수 없습니다.");
+      return;
+    }
+
+    const shouldReplace = confirm(
+      `"${teamSet.name}" 팀 세트를 불러오시겠습니까?\n` +
+      `${teamSet.teams.length}개의 팀이 현재 팀 목록을 대체합니다.`
+    );
+
+    if (shouldReplace) {
+      setTeams([...teamSet.teams]);
+      
+      // 마지막 사용 시간 업데이트
+      const updatedSets = savedTeamSets.map(set => 
+        set.id === teamSetId 
+          ? { ...set, lastUsed: new Date().toISOString() }
+          : set
+      );
+      setSavedTeamSets(updatedSets);
+      
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('futsal-saved-team-sets', JSON.stringify(updatedSets));
+      }
+
+      setShowLoadDialog(false);
+      alert(`"${teamSet.name}" 팀 세트를 불러왔습니다!`);
+    }
+  };
+
+  // 팀 세트 삭제
+  const deleteTeamSet = (teamSetId: string) => {
+    const teamSet = savedTeamSets.find(set => set.id === teamSetId);
+    if (!teamSet) return;
+
+    const shouldDelete = confirm(`"${teamSet.name}" 팀 세트를 삭제하시겠습니까?`);
+    if (shouldDelete) {
+      const updatedSets = savedTeamSets.filter(set => set.id !== teamSetId);
+      setSavedTeamSets(updatedSets);
+      
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('futsal-saved-team-sets', JSON.stringify(updatedSets));
+      }
+      
+      alert("팀 세트가 삭제되었습니다.");
+    }
+  };
+
+  // 데이터 내보내기 (파일로)
+  const exportTeamData = () => {
+    const exportData = {
+      teams,
+      savedTeamSets,
+      exportDate: new Date().toISOString(),
+      version: '1.0'
+    };
+
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `futsal-teams-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setShowExportDialog(false);
+    alert("팀 데이터가 파일로 내보내기 되었습니다!");
+  };
+
+  // 데이터 가져오기 (파일에서)
+  const importTeamData = () => {
+    if (!importData.trim()) {
+      alert("가져올 데이터를 입력해주세요.");
+      return;
+    }
+
+    try {
+      const data = JSON.parse(importData);
+      
+      if (!data.teams && !data.savedTeamSets) {
+        alert("올바른 팀 데이터 형식이 아닙니다.");
+        return;
+      }
+
+      const shouldImport = confirm(
+        "팀 데이터를 가져오시겠습니까?\n" +
+        `현재 팀: ${teams.length}개 → 가져올 팀: ${data.teams?.length || 0}개\n` +
+        `현재 저장된 세트: ${savedTeamSets.length}개 → 가져올 세트: ${data.savedTeamSets?.length || 0}개`
+      );
+
+      if (shouldImport) {
+        if (data.teams) {
+          setTeams(data.teams);
+        }
+        
+        if (data.savedTeamSets) {
+          // 기존 세트와 중복 방지
+          const mergedSets = [...savedTeamSets];
+          data.savedTeamSets.forEach((newSet: SavedTeamSet) => {
+            if (!mergedSets.find(existing => existing.name === newSet.name)) {
+              mergedSets.push({
+                ...newSet,
+                id: generateId(), // 새 ID 생성
+              });
+            }
+          });
+          
+          setSavedTeamSets(mergedSets);
+          
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('futsal-saved-team-sets', JSON.stringify(mergedSets));
+          }
+        }
+
+        setImportData("");
+        setShowImportDialog(false);
+        alert("팀 데이터를 성공적으로 가져왔습니다!");
+      }
+    } catch (error) {
+      alert("데이터 형식이 올바르지 않습니다. JSON 형식을 확인해주세요.");
+    }
+  };
+
+  // 파일 업로드 핸들러
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      setImportData(content);
+    };
+    reader.readAsText(file);
+  };
+
+  // 기존 팀 관리 함수들
   const createTeam = () => {
     if (!newTeamName.trim()) {
       alert("팀 이름을 입력하세요.");
@@ -44,12 +251,7 @@ export default function TeamManagement({ teams, setTeams, setAppPhase }: Props) 
       createdAt: new Date().toISOString(),
     };
     
-    console.log('Creating new team:', newTeam);
-    setTeams(prev => {
-      const updated = [...prev, newTeam];
-      console.log('Updated teams after creation:', updated);
-      return updated;
-    });
+    setTeams(prev => [...prev, newTeam]);
     setNewTeamName("");
   };
 
@@ -75,7 +277,6 @@ export default function TeamManagement({ teams, setTeams, setAppPhase }: Props) 
       name: newPlayerName,
     };
     
-    console.log('Adding player to team:', teamId, newPlayer);
     setTeams(prev =>
       prev.map(t =>
         t.id === teamId ? { ...t, players: [...t.players, newPlayer] } : t
@@ -143,92 +344,240 @@ export default function TeamManagement({ teams, setTeams, setAppPhase }: Props) 
     setEditedPlayerName("");
   };
 
-  // 전체 저장 함수
-  const saveToGlobalTeams = () => {
-    const shouldSave = confirm(
-      '현재 팀 설정을 전체 팀 목록에 저장하시겠습니까?\n' +
-      '저장하면 다른 경기에서도 이 팀들을 사용할 수 있습니다.'
-    );
-    
-    if (shouldSave) {
-      // 전역 팀 데이터에 저장
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('futsal-global-teams', JSON.stringify(teams));
-      }
-      alert('팀 데이터가 전체 목록에 저장되었습니다!');
-    }
-  };
-
-  // 전역 팀 불러오기
-  const loadFromGlobalTeams = () => {
-    if (typeof window !== 'undefined') {
-      const savedGlobalTeams = localStorage.getItem('futsal-global-teams');
-      if (savedGlobalTeams) {
-        try {
-          const globalTeams = JSON.parse(savedGlobalTeams);
-          if (globalTeams.length > 0) {
-            const shouldLoad = confirm(
-              '저장된 ' + globalTeams.length + '개의 팀을 불러오시겠습니까?\n' +
-              '현재 작업 중인 팀 데이터는 대체됩니다.'
-            );
-            
-            if (shouldLoad) {
-              setTeams(globalTeams);
-              alert('전체 팀 목록을 불러왔습니다!');
-            }
-          } else {
-            alert('저장된 전체 팀 목록이 없습니다.');
-          }
-        } catch {
-          alert('팀 데이터를 불러오는 중 오류가 발생했습니다.');
-        }
-      } else {
-        alert('저장된 전체 팀 목록이 없습니다.');
-      }
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-6">
       <div className="max-w-6xl mx-auto">
-        {/* 헤더 */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">👥 팀 관리</h1>
-          <p className="text-gray-600">팀과 선수를 추가하고 관리하세요</p>
-        </div>
-
-        {/* 전역 팀 관리 버튼들 */}
+        {/* 팀 세트 관리 */}
         <Card className="mb-6 border-purple-200 bg-purple-50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <span className="text-2xl">💾</span>
-              팀 데이터 관리
+              팀 세트 관리
             </CardTitle>
             <CardDescription>
-              팀 데이터를 저장하고 불러와서 다른 경기에서도 사용하세요
+              여러 팀 구성을 저장하고 불러와서 재사용하세요
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4">
-              <Button onClick={saveToGlobalTeams} variant="outline" className="flex-1">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <Button onClick={() => setShowSaveDialog(true)} variant="outline" className="flex-1">
                 <span className="mr-2">💾</span>
-                전체 목록에 저장
+                현재 팀 저장
               </Button>
-              <Button onClick={loadFromGlobalTeams} variant="outline" className="flex-1">
+              <Button onClick={() => setShowLoadDialog(true)} variant="outline" className="flex-1">
                 <span className="mr-2">📂</span>
-                전체 목록에서 불러오기
+                팀 세트 불러오기
+              </Button>
+              <Button onClick={() => setShowExportDialog(true)} variant="outline" className="flex-1">
+                <span className="mr-2">📤</span>
+                파일로 내보내기
+              </Button>
+              <Button onClick={() => setShowImportDialog(true)} variant="outline" className="flex-1">
+                <span className="mr-2">📥</span>
+                파일에서 가져오기
               </Button>
             </div>
-            <div className="mt-3 text-sm text-purple-700 bg-purple-100 p-3 rounded-lg">
-              <p className="font-medium mb-1">💡 팁:</p>
-              <ul className="space-y-1">
-                <li>• 전체 목록에 저장: 현재 팀들을 모든 경기에서 사용할 수 있도록 저장</li>
-                <li>• 전체 목록에서 불러오기: 이전에 저장한 팀들을 현재 경기로 가져오기</li>
-                <li>• 경기가 끝나도 저장된 팀 데이터는 사라지지 않습니다</li>
-              </ul>
-            </div>
+            
+            {savedTeamSets.length > 0 && (
+              <div className="mt-4 p-3 bg-purple-100 rounded-lg">
+                <p className="text-sm text-purple-700 font-medium mb-2">
+                  💡 저장된 팀 세트: {savedTeamSets.length}개
+                </p>
+                <div className="text-xs text-purple-600 space-y-1">
+                  {savedTeamSets.slice(0, 3).map(set => (
+                    <div key={set.id}>• {set.name} ({set.teams.length}개 팀)</div>
+                  ))}
+                  {savedTeamSets.length > 3 && <div>• 그 외 {savedTeamSets.length - 3}개...</div>}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
+
+        {/* 저장 다이얼로그 */}
+        {showSaveDialog && (
+          <Card className="mb-6 border-green-200 bg-green-50">
+            <CardHeader>
+              <CardTitle>💾 팀 세트 저장</CardTitle>
+              <CardDescription>현재 {teams.length}개 팀을 새로운 세트로 저장합니다</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">세트 이름 *</label>
+                  <Input
+                    value={saveSetName}
+                    onChange={(e) => setSaveSetName(e.target.value)}
+                    placeholder="예: 주말 정기모임 팀"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">설명 (선택사항)</label>
+                  <textarea
+                    value={saveSetDescription}
+                    onChange={(e) => setSaveSetDescription(e.target.value)}
+                    placeholder="이 팀 세트에 대한 설명을 입력하세요"
+                    rows={3}
+                    className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={saveTeamSet} className="flex-1">저장</Button>
+                  <Button onClick={() => setShowSaveDialog(false)} variant="outline" className="flex-1">취소</Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 불러오기 다이얼로그 */}
+        {showLoadDialog && (
+          <Card className="mb-6 border-blue-200 bg-blue-50">
+            <CardHeader>
+              <CardTitle>📂 팀 세트 불러오기</CardTitle>
+              <CardDescription>저장된 팀 세트를 선택하여 불러오세요</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {savedTeamSets.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>저장된 팀 세트가 없습니다.</p>
+                  <p>먼저 팀을 만들고 저장해보세요!</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <Select value={selectedTeamSetId} onValueChange={setSelectedTeamSetId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="불러올 팀 세트를 선택하세요" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {savedTeamSets.map(teamSet => (
+                          <SelectItem key={teamSet.id} value={teamSet.id}>
+                            {teamSet.name} ({teamSet.teams.length}개 팀)
+                            {teamSet.lastUsed && (
+                              <span className="text-xs text-gray-500 ml-2">
+                                마지막 사용: {new Date(teamSet.lastUsed).toLocaleDateString()}
+                              </span>
+                            )}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {selectedTeamSetId && (
+                    <div className="p-3 bg-white rounded border">
+                      {(() => {
+                        const selected = savedTeamSets.find(set => set.id === selectedTeamSetId);
+                        return selected ? (
+                          <div>
+                            <h4 className="font-medium">{selected.name}</h4>
+                            <p className="text-sm text-gray-600 mt-1">{selected.description}</p>
+                            <div className="text-xs text-gray-500 mt-2">
+                              생성일: {new Date(selected.createdAt).toLocaleDateString()}
+                            </div>
+                            <div className="mt-2">
+                              <div className="text-sm font-medium">포함된 팀:</div>
+                              <div className="grid grid-cols-2 gap-1 mt-1">
+                                {selected.teams.map(team => (
+                                  <div key={team.id} className="text-xs bg-gray-100 p-1 rounded">
+                                    {team.name} ({team.players.length}명)
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                  )}
+                  
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={() => selectedTeamSetId && loadTeamSet(selectedTeamSetId)} 
+                      disabled={!selectedTeamSetId}
+                      className="flex-1"
+                    >
+                      불러오기
+                    </Button>
+                    <Button 
+                      onClick={() => selectedTeamSetId && deleteTeamSet(selectedTeamSetId)} 
+                      disabled={!selectedTeamSetId}
+                      variant="destructive"
+                    >
+                      삭제
+                    </Button>
+                    <Button onClick={() => setShowLoadDialog(false)} variant="outline">취소</Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 내보내기 다이얼로그 */}
+        {showExportDialog && (
+          <Card className="mb-6 border-orange-200 bg-orange-50">
+            <CardHeader>
+              <CardTitle>📤 데이터 내보내기</CardTitle>
+              <CardDescription>팀 데이터를 파일로 저장하여 다른 사람과 공유하세요</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="p-3 bg-white rounded border">
+                  <div className="text-sm">
+                    <p><strong>현재 팀:</strong> {teams.length}개</p>
+                    <p><strong>저장된 팀 세트:</strong> {savedTeamSets.length}개</p>
+                    <p className="text-gray-600 mt-2">
+                      이 데이터들이 JSON 파일로 내보내집니다.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={exportTeamData} className="flex-1">파일로 내보내기</Button>
+                  <Button onClick={() => setShowExportDialog(false)} variant="outline">취소</Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 가져오기 다이얼로그 */}
+        {showImportDialog && (
+          <Card className="mb-6 border-yellow-200 bg-yellow-50">
+            <CardHeader>
+              <CardTitle>📥 데이터 가져오기</CardTitle>
+              <CardDescription>다른 사람이 공유한 팀 데이터를 가져오세요</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">파일 선택</label>
+                  <Input
+                    type="file"
+                    accept=".json"
+                    onChange={handleFileUpload}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">또는 JSON 데이터 직접 입력</label>
+                  <textarea
+                    value={importData}
+                    onChange={(e) => setImportData(e.target.value)}
+                    placeholder='{"teams": [...], "savedTeamSets": [...]}'
+                    rows={6}
+                    className="font-mono text-xs flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={importTeamData} className="flex-1">데이터 가져오기</Button>
+                  <Button onClick={() => setShowImportDialog(false)} variant="outline">취소</Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* 새 팀 추가 카드 */}
         <Card className="mb-8">
@@ -264,8 +613,8 @@ export default function TeamManagement({ teams, setTeams, setAppPhase }: Props) 
             <CardContent className="text-center py-12">
               <div className="text-6xl mb-4">👥</div>
               <p className="text-gray-500 text-lg mb-2">아직 팀이 없습니다</p>
-                              <p className="text-gray-400 mb-4">위에서 새 팀을 만들거나 저장된 팀을 불러와보세요!</p>
-              <Button onClick={loadFromGlobalTeams} variant="outline">
+              <p className="text-gray-400 mb-4">위에서 새 팀을 만들거나 저장된 팀을 불러와보세요!</p>
+              <Button onClick={() => setShowLoadDialog(true)} variant="outline">
                 <span className="mr-2">📂</span>
                 저장된 팀 불러오기
               </Button>
@@ -446,9 +795,10 @@ export default function TeamManagement({ teams, setTeams, setAppPhase }: Props) 
 
               <div className="flex gap-2">
                 <Button 
-                  onClick={saveToGlobalTeams}
+                  onClick={() => setShowSaveDialog(true)}
                   variant="outline"
                   size="lg"
+                  disabled={teams.length === 0}
                 >
                   <span className="mr-2">💾</span>
                   저장

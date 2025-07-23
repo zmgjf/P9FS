@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import type { Match, GameSet, Team, AppPhase, PlayerPosition } from "@/lib/types";
+import AppNavigation from "@/components/AppNavigation";
 import TeamManagement from "@/components/TeamManagement";
 import SetSetup from "@/components/SetSetup";
 import FormationSetup from "@/components/FormationSetup";
@@ -229,6 +230,32 @@ export default function Page() {
     }
   };
 
+  // 뒤로가기 핸들러
+  const handleBack = () => {
+    switch (appPhase) {
+      case 'teamManagement':
+        handleBackToGlobalTeams();
+        setAppPhase('matchManagement');
+        break;
+      case 'setSetup':
+        setAppPhase('teamManagement');
+        break;
+      case 'formationSetup':
+        setAppPhase('setSetup');
+        break;
+      case 'playing':
+      case 'gameReady':
+        setAppPhase('formationSetup');
+        break;
+      case 'matchHistory':
+      case 'statistics':
+        setAppPhase('matchManagement');
+        break;
+      default:
+        setAppPhase('matchManagement');
+    }
+  };
+
   // 앱 페이즈 변경 핸들러 (팀 관리에서 나갈 때 전역 저장 확인)
   const handleAppPhaseChange = (newPhase: AppPhase) => {
     if (appPhase === "teamManagement" && newPhase !== "teamManagement") {
@@ -253,76 +280,86 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen">
-      {appPhase === "matchManagement" && (
-        <MatchManagement
-          matches={matches}
-          setMatches={setMatches}
-          setCurrentMatch={handleMatchSelect}
-          setAppPhase={simpleSetAppPhase}
-        />
-      )}
-      
-      {appPhase === "teamManagement" && (
-        <TeamManagement
-          teams={currentMatchTeams}
-          setTeams={handleCurrentMatchTeamsUpdate}
-          setAppPhase={simpleSetAppPhase}
-        />
-      )}
-      
-      {appPhase === "setSetup" && (
-        <SetSetup
-          sets={sets}
-          setSets={handleSetsUpdate}
-          teams={currentMatchTeams}
-          setAppPhase={simpleSetAppPhase}
-          setCurrentSetIndex={setCurrentSetIndex}
-        />
-      )}
-      
-      {appPhase === "formationSetup" && currentSet && (
-        <FormationSetup
-          currentSet={currentSet}
-          setCurrentSet={(newSet) => {
-            const newSets = sets.map((set, index) => 
-              index === currentSetIndex ? newSet : set
-            );
-            handleSetsUpdate(newSets);
-          }}
-          setAppPhase={simpleSetAppPhase}
-          onFormationReady={handleFormationReady}
-        />
-      )}
-      
-      {(appPhase === "playing" || appPhase === "gameReady") && currentSet && (
-        <GameScreen
-          currentSet={currentSet}
-          setCurrentSet={(newSet) => {
-            const newSets = sets.map((s, idx) => (idx === currentSetIndex ? newSet : s));
-            handleSetsUpdate(newSets);
-          }}
-          setAppPhase={simpleSetAppPhase}
-          initialPositions={currentFormation}
-          teamACount={teamACount}
-          teamBCount={teamBCount}
-          onMatchComplete={handleMatchComplete}
-        />
-      )}
+    <div className="min-h-screen bg-gray-50">
+      {/* 공통 네비게이션 */}
+      <AppNavigation 
+        currentPhase={appPhase}
+        setAppPhase={simpleSetAppPhase}
+        onBack={handleBack}
+      />
 
-      {appPhase === "matchHistory" && (
-        <MatchHistory
-          sets={[...completedSets, ...sets.filter(set => set.events.length > 0)]}
-          setAppPhase={simpleSetAppPhase}
-        />
-      )}
+      <div className="pt-4">
+        {appPhase === "matchManagement" && (
+          <MatchManagement
+            matches={matches}
+            setMatches={setMatches}
+            setCurrentMatch={handleMatchSelect}
+            setAppPhase={simpleSetAppPhase}
+          />
+        )}
+        
+        {appPhase === "teamManagement" && (
+          <TeamManagement
+            teams={currentMatchTeams}
+            setTeams={handleCurrentMatchTeamsUpdate}
+            setAppPhase={simpleSetAppPhase}
+          />
+        )}
+        
+        {appPhase === "setSetup" && (
+          <SetSetup
+            sets={sets}
+            setSets={handleSetsUpdate}
+            teams={currentMatchTeams}
+            setAppPhase={simpleSetAppPhase}
+            setCurrentSetIndex={setCurrentSetIndex}
+          />
+        )}
+        
+        {appPhase === "formationSetup" && currentSet && (
+          <FormationSetup
+            currentSet={currentSet}
+            setCurrentSet={(newSet) => {
+              const newSets = sets.map((set, index) => 
+                index === currentSetIndex ? newSet : set
+              );
+              handleSetsUpdate(newSets);
+            }}
+            setAppPhase={simpleSetAppPhase}
+            onFormationReady={handleFormationReady}
+          />
+        )}
+        
+        {(appPhase === "playing" || appPhase === "gameReady") && currentSet && (
+          <GameScreen
+            currentSet={currentSet}
+            setCurrentSet={(newSet) => {
+              const newSets = sets.map((s, idx) => (idx === currentSetIndex ? newSet : s));
+              handleSetsUpdate(newSets);
+            }}
+            setAppPhase={simpleSetAppPhase}
+            initialPositions={currentFormation}
+            teamACount={teamACount}
+            teamBCount={teamBCount}
+            onMatchComplete={handleMatchComplete}
+          />
+        )}
 
-      {appPhase === "statistics" && (
-        <Statistics
-          sets={[...completedSets, ...sets.filter(set => set.events.length > 0)]}
-          setAppPhase={simpleSetAppPhase}
-        />
-      )}
+        {appPhase === "matchHistory" && (
+          <MatchHistory
+            matches={matches}
+            sets={[...completedSets, ...sets.filter(set => set.events.length > 0)]}
+            setAppPhase={simpleSetAppPhase}
+          />
+        )}
+
+        {appPhase === "statistics" && (
+          <Statistics
+            sets={[...completedSets, ...sets.filter(set => set.events.length > 0)]}
+            setAppPhase={simpleSetAppPhase}
+          />
+        )}
+      </div>
     </div>
   );
 }

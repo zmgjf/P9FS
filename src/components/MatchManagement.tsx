@@ -1,8 +1,8 @@
+// src/components/MatchManagement.tsx - 간단한 버전
 "use client";
 
 import React, { useState } from "react";
-import type { Match } from "@/lib/types";
-import type { AppPhase } from "@/lib/types";
+import type { Match, AppPhase } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +25,13 @@ export default function MatchManagement({ matches, setMatches, setCurrentMatch, 
   const [editedMatchDescription, setEditedMatchDescription] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'scheduled' | 'ongoing' | 'completed'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // 데이터 공유 관련 상태
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importData, setImportData] = useState("");
+  const [exportType, setExportType] = useState<'all' | 'selected'>('all');
+  const [selectedMatches, setSelectedMatches] = useState<Set<string>>(new Set());
 
   const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
 
@@ -73,6 +80,11 @@ export default function MatchManagement({ matches, setMatches, setCurrentMatch, 
   const deleteMatch = (matchId: string) => {
     if (confirm("이 경기를 삭제하시겠습니까? 모든 세트와 기록이 함께 삭제됩니다.")) {
       setMatches(prev => prev.filter(match => match.id !== matchId));
+      setSelectedMatches(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(matchId);
+        return newSet;
+      });
     }
   };
 
@@ -94,6 +106,106 @@ export default function MatchManagement({ matches, setMatches, setCurrentMatch, 
       }))
     };
     setMatches(prev => [...prev, duplicatedMatch]);
+  };
+
+  // 데이터 내보내기
+  const exportMatchData = () => {
+    const matchesToExport = exportType === 'all' 
+      ? matches 
+      : matches.filter(match => selectedMatches.has(match.id));
+
+    if (matchesToExport.length === 0) {
+      alert("내보낼 경기가 없습니다.");
+      return;
+    }
+
+    const exportData = {
+      matches: matchesToExport,
+      exportDate: new Date().toISOString(),
+      version: '1.0',
+      appName: 'Futsal Manager'
+    };
+
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `futsal-matches-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setShowExportDialog(false);
+    setSelectedMatches(new Set());
+    alert(`${matchesToExport.length}개 경기가 파일로 내보내기 되었습니다!`);
+  };
+
+  // 데이터 가져오기
+  const importMatchData = () => {
+    if (!importData.trim()) {
+      alert("가져올 데이터를 입력해주세요.");
+      return;
+    }
+
+    try {
+      const data = JSON.parse(importData);
+      
+      if (!data.matches || !Array.isArray(data.matches)) {
+        alert("올바른 경기 데이터 형식이 아닙니다.");
+        return;
+      }
+
+      const shouldImport = confirm(
+        `${data.matches.length}개의 경기를 가져오시겠습니까?\n` +
+        "기존 경기 목록에 추가됩니다."
+      );
+
+      if (shouldImport) {
+        // ID 중복 방지를 위해 새 ID 생성
+        const importedMatches = data.matches.map((match: Match) => ({
+          ...match,
+          id: generateId(),
+          sets: match.sets?.map(set => ({
+            ...set,
+            id: generateId()
+          })) || []
+        }));
+
+        setMatches(prev => [...prev, ...importedMatches]);
+        setImportData("");
+        setShowImportDialog(false);
+        alert(`${importedMatches.length}개 경기를 성공적으로 가져왔습니다!`);
+      }
+    } catch (error) {
+      alert("데이터 형식이 올바르지 않습니다. JSON 형식을 확인해주세요.");
+    }
+  };
+
+  // 파일 업로드 핸들러
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      setImportData(content);
+    };
+    reader.readAsText(file);
+  };
+
+  // 경기 선택 토글
+  const toggleMatchSelection = (matchId: string) => {
+    const newSelected = new Set(selectedMatches);
+    if (newSelected.has(matchId)) {
+      newSelected.delete(matchId);
+    } else {
+      newSelected.add(matchId);
+    }
+    setSelectedMatches(newSelected);
   };
 
   const startEditing = (match: Match) => {
@@ -172,12 +284,6 @@ export default function MatchManagement({ matches, setMatches, setCurrentMatch, 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-6">
       <div className="max-w-6xl mx-auto">
-        {/* 헤더 */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">⚽ 풋살 매니저</h1>
-          <p className="text-gray-600">경기를 생성하고 관리하세요</p>
-        </div>
-
         {/* 통계 카드 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <Card className="text-center">
@@ -205,6 +311,130 @@ export default function MatchManagement({ matches, setMatches, setCurrentMatch, 
             </CardContent>
           </Card>
         </div>
+
+        {/* 데이터 관리 섹션 */}
+        <Card className="mb-8 border-purple-200 bg-purple-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <span className="text-2xl">🔄</span>
+              데이터 공유 및 백업
+            </CardTitle>
+            <CardDescription>
+              경기 데이터를 파일로 내보내거나 다른 사람의 데이터를 가져오세요
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Button onClick={() => setShowExportDialog(true)} variant="outline" className="flex-1">
+                <span className="mr-2">📤</span>
+                경기 내보내기
+              </Button>
+              <Button onClick={() => setShowImportDialog(true)} variant="outline" className="flex-1">
+                <span className="mr-2">📥</span>
+                경기 가져오기
+              </Button>
+            </div>
+            {matches.length > 0 && (
+              <div className="mt-4 p-3 bg-purple-100 rounded-lg">
+                <p className="text-sm text-purple-700">
+                  💡 데이터를 내보내면 다른 사람과 경기 정보를 공유할 수 있습니다
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 내보내기 다이얼로그 */}
+        {showExportDialog && (
+          <Card className="mb-6 border-orange-200 bg-orange-50">
+            <CardHeader>
+              <CardTitle>📤 경기 데이터 내보내기</CardTitle>
+              <CardDescription>선택한 경기들을 파일로 내보내서 공유하세요</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">내보내기 옵션</label>
+                  <Select value={exportType} onValueChange={(value: 'all' | 'selected') => setExportType(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">모든 경기 ({matches.length}개)</SelectItem>
+                      <SelectItem value="selected">선택한 경기 ({selectedMatches.size}개)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {exportType === 'selected' && (
+                  <div>
+                    <label className="text-sm font-medium">내보낼 경기 선택</label>
+                    <div className="max-h-40 overflow-y-auto border rounded p-2 mt-1">
+                      {matches.map(match => (
+                        <div key={match.id} className="flex items-center gap-2 p-1">
+                          <input
+                            type="checkbox"
+                            checked={selectedMatches.has(match.id)}
+                            onChange={() => toggleMatchSelection(match.id)}
+                          />
+                          <span className="text-sm">{match.name} - {match.venue}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={exportMatchData} 
+                    className="flex-1"
+                    disabled={exportType === 'selected' && selectedMatches.size === 0}
+                  >
+                    파일로 내보내기
+                  </Button>
+                  <Button onClick={() => setShowExportDialog(false)} variant="outline">취소</Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 가져오기 다이얼로그 */}
+        {showImportDialog && (
+          <Card className="mb-6 border-yellow-200 bg-yellow-50">
+            <CardHeader>
+              <CardTitle>📥 경기 데이터 가져오기</CardTitle>
+              <CardDescription>다른 사람이 공유한 경기 데이터를 가져오세요</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">파일 선택</label>
+                  <Input
+                    type="file"
+                    accept=".json"
+                    onChange={handleFileUpload}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">또는 JSON 데이터 직접 입력</label>
+                  <textarea
+                    value={importData}
+                    onChange={(e) => setImportData(e.target.value)}
+                    placeholder='{"matches": [...], "exportDate": "..."}'
+                    rows={6}
+                    className="font-mono text-xs flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={importMatchData} className="flex-1">데이터 가져오기</Button>
+                  <Button onClick={() => setShowImportDialog(false)} variant="outline">취소</Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* 메뉴 버튼들 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
