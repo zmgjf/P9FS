@@ -179,7 +179,7 @@ export default function MatchManagement({ matches, setMatches, setCurrentMatch, 
         setShowImportDialog(false);
         alert(`${importedMatches.length}개 경기를 성공적으로 가져왔습니다!`);
       }
-    } catch (error) {
+    } catch (err) {
       alert("데이터 형식이 올바르지 않습니다. JSON 형식을 확인해주세요.");
     }
   };

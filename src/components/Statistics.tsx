@@ -205,11 +205,11 @@ export default function Statistics({ sets, setAppPhase }: Props) {
 
   // 정렬된 선수 통계
   const sortedPlayerStats = useMemo(() => {
-    let filtered = showTopPlayersOnly 
+    const filteredStats = showTopPlayersOnly 
       ? playerStats.filter(p => p.goals > 0 || p.assists > 0)
       : playerStats;
 
-    return [...filtered].sort((a, b) => {
+    return [...filteredStats].sort((a, b) => {
       const aValue = a[playerSortField];
       const bValue = b[playerSortField];
       

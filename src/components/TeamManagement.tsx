@@ -219,7 +219,7 @@ export default function TeamManagement({ teams, setTeams, setAppPhase }: Props) 
         setShowImportDialog(false);
         alert("팀 데이터를 성공적으로 가져왔습니다!");
       }
-    } catch (error) {
+    } catch (err) {
       alert("데이터 형식이 올바르지 않습니다. JSON 형식을 확인해주세요.");
     }
   };
